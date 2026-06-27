@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FitForge Diagnostics</title>
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+<style>
+body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
+.ok { color: #4caf50; } .err { color: #f44336; }
+pre { background: #222; padding: 10px; white-space: pre-wrap; word-break: break-word; font-size:11px; }
+</style>
+</head>
+<body>
+<h2>FitForge Module Diagnostics</h2>
+<div id="log"></div>
+<script type="module">
+const log = document.getElementById("log");
+function out(msg, cls) {
+  const p = document.createElement("p");
+  if (cls) p.className = cls;
+  p.textContent = msg;
+  log.appendChild(p);
+}
+const modules = [
+  "/js/db.js", "/js/store.js",
+  "/js/services/macroCalculator.js",
+  "/js/services/bodyFatEstimator.js",
+  "/js/services/notifications.js",
+  "/js/views/Dashboard.js",
+  "/js/views/WorkoutLogger.js",
+  "/js/views/BodyMetrics.js",
+  "/js/views/SleepTracker.js",
+  "/js/views/Hydration.js",
+  "/js/views/Schedule.js",
+  "/js/views/ProgressPhotos.js",
+  "/js/views/Settings.js",
+  "/js/views/MealTracker.js"
+];
+for (const mod of modules) {
+  try {
+    await import(mod);
+    out("OK: " + mod, "ok");
+  } catch(e) {
+    out("FAIL: " + mod, "err");
+    const pre = document.createElement("pre");
+    pre.textContent = String(e.message) + "\n" + String(e.stack);
+    log.appendChild(pre);
+  }
+}
+out("--- Done ---");
+</script>
+</body>
+</html>

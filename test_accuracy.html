@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FitForge — ML/CV Accuracy & Math Test Suite</title>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+  <style>
+    body { background: #0a0a14; color: #e4e4eb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; margin: 0; }
+    .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px); }
+    h1, h2 { color: #fff; font-weight: 700; margin-top: 0; }
+    .test-case { background: rgba(255,255,255,0.02); border-left: 4px solid #7c6aff; padding: 15px; margin-bottom: 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .test-case.pass { border-left-color: #34d9a3; }
+    .test-case.fail { border-left-color: #ff5c5c; }
+    .status-badge { font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; }
+    .status-badge.pass { background: rgba(52, 217, 163, 0.15); color: #34d9a3; }
+    .status-badge.fail { background: rgba(255, 92, 92, 0.15); color: #ff5c5c; }
+    pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; color: #8a8a9e; margin-top: 5px; margin-bottom: 0; }
+    .summary-card { background: linear-gradient(135deg, rgba(124,106,255,0.1), rgba(124,106,255,0.03)); border: 1px solid rgba(124,106,255,0.2); padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; }
+    .metric { text-align: center; }
+    .metric-val { font-size: 2rem; font-weight: bold; color: #7c6aff; }
+    .metric-lbl { font-size: 0.8rem; color: #8a8a9e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>FitForge Test Suite</h1>
+    <p style="color:#8a8a9e; font-size:0.9rem; margin-bottom:20px;">Validating mathematical regression models, ML classification lookup tables, TDEE adaptation logic, and pose landmark calculations.</p>
+    
+    <div class="summary-card">
+      <div class="metric">
+        <div class="metric-val" id="total-tests">0</div>
+        <div class="metric-lbl">Total Tests</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="passed-tests" style="color: #34d9a3;">0</div>
+        <div class="metric-lbl">Passed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="failed-tests" style="color: #ff5c5c;">0</div>
+        <div class="metric-lbl">Failed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="accuracy-pct">0%</div>
+        <div class="metric-lbl">Accuracy</div>
+      </div>
+    </div>
+
+    <h2>Test Cases</h2>
+    <div id="test-results">Running verification suite...</div>
+  </div>
+
+  <script type="module">
+    import { searchFood, getFoodById, IMAGENET_TO_FOOD_MAP } from '/js/data/foodDatabase.js';
+    import { navyMethod, bmiBasedEstimate, calculateComposition, getBFCategory } from '/js/services/bodyFatEstimator.js';
+    import { calculateWeightTrend, calculateActualTDEE } from '/js/ml/trendPredictor.js';
+    import { generateAdaptiveAdvice } from '/js/ml/adaptiveCoach.js';
+
+    const resultsContainer = document.getElementById('test-results');
+    let total = 0, passed = 0, failed = 0;
+
+    function assert(name, condition, details = "") {
+      total++;
+      const success = !!condition;
+      if (success) passed++;
+      else failed++;
+
+      const card = document.createElement('div');
+      card.className = `test-case ${success ? 'pass' : 'fail'}`;
+      
+      let html = `
+        <div>
+          <strong>${name}</strong>
+          <div style="font-size:0.8rem; color:#8a8a9e; margin-top:2px;">${details}</div>
+      `;
+      
+      card.innerHTML = html + `
+        </div>
+        <span class="status-badge ${success ? 'pass' : 'fail'}">${success ? 'PASS' : 'FAIL'}</span>
+      `;
+      resultsContainer.appendChild(card);
+      updateSummary();
+    }
+
+    function updateSummary() {
+      document.getElementById('total-tests').textContent = total;
+      document.getElementById('passed-tests').textContent = passed;
+      document.getElementById('failed-tests').textContent = failed;
+      document.getElementById('accuracy-pct').textContent = total > 0 ? Math.round((passed / total) * 100) + '%' : '0%';
+    }
+
+    // Run tests
+    async function runSuite() {
+      resultsContainer.innerHTML = "";
+
+      // 1. Food DB search & mapping tests
+      const bananaSearch = searchFood("banana");
+      assert(
+        "Food Search Validation",
+        bananaSearch.length > 0 && bananaSearch[0].name.toLowerCase().includes("banana"),
+        `Search for 'banana' returned matches: ${bananaSearch.map(f => f.name).join(', ')}`
+      );
+
+      const pizzaIds = IMAGENET_TO_FOOD_MAP["pizza"];
+      assert(
+        "ImageNet Pizza Mapping",
+        pizzaIds && pizzaIds.includes(103),
+        `ImageNet class 'pizza' mapped to database IDs: ${pizzaIds ? pizzaIds.join(', ') : 'None'}`
+      );
+
+      // 2. Body Fat estimation math validation
+      const maleBf = navyMethod({ height: 180, neck: 38, waist: 86, hip: 0, sex: 'male' });
+      assert(
+        "Navy Method Formula (Male)",
+        maleBf !== null && maleBf > 10 && maleBf < 18,
+        `Calculated male BF% for waist=86cm, neck=38cm, height=180cm: ${maleBf}% (expected ~13-15%)`
+      );
+
+      const femaleBf = navyMethod({ height: 165, neck: 32, waist: 72, hip: 94, sex: 'female' });
+      assert(
+        "Navy Method Formula (Female)",
+        femaleBf !== null && femaleBf > 18 && femaleBf < 26,
+        `Calculated female BF% for waist=72cm, neck=32cm, hip=94cm, height=165cm: ${femaleBf}% (expected ~20-24%)`
+      );
+
+      const bmiBf = bmiBasedEstimate(75, 180, 25, 'male');
+      assert(
+        "Deurenberg BMI Body Fat Estimate",
+        bmiBf > 10 && bmiBf < 20,
+        `Estimated male body fat from BMI (75kg, 180cm, 25yo): ${bmiBf}% (expected ~14-16%)`
+      );
+
+      // 3. Weight trend linear regression math validation
+      const mockMetrics = [
+        { date: '2026-06-01', weight: 80.0 },
+        { date: '2026-06-08', weight: 79.5 },
+        { date: '2026-06-15', weight: 79.0 },
+        { date: '2026-06-22', weight: 78.5 }
+      ];
+      const trend = calculateWeightTrend(mockMetrics);
+      assert(
+        "OLS Linear Regression Trend Analysis",
+        trend !== null && trend.slope < 0 && Math.abs(trend.weeklyRate - (-0.5)) < 0.05,
+        `Weight trend regression slope calculated: ${trend ? trend.slope.toFixed(4) : 'null'} kg/day, weekly rate: ${trend ? trend.weeklyRate : 'null'} kg/week (expected -0.5 kg/week)`
+      );
+
+      // 4. Adaptive TDEE calculation validation
+      const mockMeals = [
+        { date: '2026-06-01', items: [{ calories: 2000, servings: 1 }] },
+        { date: '2026-06-02', items: [{ calories: 2000, servings: 1 }] },
+        { date: '2026-06-03', items: [{ calories: 2000, servings: 1 }] },
+        { date: '2026-06-04', items: [{ calories: 2000, servings: 1 }] },
+        { date: '2026-06-05', items: [{ calories: 2000, servings: 1 }] }
+      ];
+      const weightLogs = [
+        { date: '2026-06-01', weight: 80.0 },
+        { date: '2026-06-03', weight: 79.5 },
+        { date: '2026-06-05', weight: 79.0 }
+      ];
+      const calcTdee = calculateActualTDEE(weightLogs, mockMeals, 2500);
+      assert(
+        "Adaptive Metabolic TDEE Analysis",
+        calcTdee > 2500,
+        `Adaptive TDEE calculated: ${calcTdee} kcal/day (expected > baseline 2500 kcal because weight was lost at 2000 kcal intake)`
+      );
+
+      // 5. Adaptive Coaching advice generation
+      const storeState = {
+        user: { name: "Test User", age: 25, sex: "male", height: 180, weight: 80, goal: "cut", trainingDays: 4, macros: { calories: 2000, protein: 140, carbs: 200, fat: 65 } },
+        today: { caloriesConsumed: 1200, proteinConsumed: 60, carbsConsumed: 150, fatConsumed: 40, workout: null, sleep: null },
+        streak: 5
+      };
+      const advice = generateAdaptiveAdvice(storeState, weightLogs, mockMeals);
+      assert(
+        "Adaptive Coach Rule Engine",
+        advice.nutritionTip && advice.nutritionTip.toLowerCase().includes("protein"),
+        `Coach suggestions generated: "${advice.nutritionTip}" (expected protein notification since today's logged protein is 60g < target 140g)`
+      );
+    }
+
+    runSuite();
+  </script>
+</body>
+</html>

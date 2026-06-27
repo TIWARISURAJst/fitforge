@@ -1,0 +1,19 @@
+# Logs
+*.log
+logs/
+
+# Packages & archives
+*.zip
+*.rar
+*.7z
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+.system_generated/
+.gemini/
+.agents/
+tempmediaStorage/
+scratch/
+browser/
+node_modules/
