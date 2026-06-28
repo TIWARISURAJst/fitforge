@@ -23,7 +23,19 @@ export async function render(container) {
   // Ensure default custom routine exists in IndexedDB
   const routines = await db.plannerRoutines.toArray();
   if (routines.length === 0) {
-    await db.plannerRoutines.add({ id: 1, name: "My Weekly Split" });
+    await db.plannerRoutines.add({ 
+      id: 1, 
+      name: "My Weekly Split",
+      dayLabels: {
+        monday: 'Chest & Shoulders',
+        tuesday: 'Back & Biceps',
+        wednesday: 'Rest Day',
+        thursday: 'Legs & Core',
+        friday: 'Shoulders & Arms',
+        saturday: 'Rest Day',
+        sunday: 'Rest Day'
+      }
+    });
   }
 
   renderContent(container);
@@ -33,6 +45,19 @@ async function renderContent(container) {
   const routines = await db.plannerRoutines.toArray();
   const currentRoutine = routines.find(r => r.id === selectedRoutineId) || routines[0] || { id: 1, name: "My Weekly Split" };
   
+  // Default fallback labels
+  const defaultLabels = {
+    monday: 'Chest Focus',
+    tuesday: 'Back Focus',
+    wednesday: 'Rest Day',
+    thursday: 'Shoulders Focus',
+    friday: 'Arms Focus',
+    saturday: 'Legs Focus',
+    sunday: 'Rest Day'
+  };
+  
+  const dayLabels = currentRoutine.dayLabels || defaultLabels;
+
   // Load all exercises for this routine
   const allScheduled = await db.plannerExercises.where({ routineId: currentRoutine.id }).toArray();
   
@@ -43,6 +68,14 @@ async function renderContent(container) {
   }, {});
 
   container.innerHTML = `
+    <style>
+      .planner-day-focus-badge:hover {
+        background: rgba(124, 58, 237, 0.15) !important;
+        color: var(--accent) !important;
+        border-color: rgba(124, 58, 237, 0.3) !important;
+      }
+    </style>
+    
     <div class="container view" id="planner-view">
       <div class="view-header">
         <div>
@@ -73,11 +106,17 @@ async function renderContent(container) {
       <div class="planner-week-grid">
         ${DAYS_OF_WEEK.map(day => {
           const exercises = grouped[day] || [];
+          const focusStr = dayLabels[day] || 'Rest Day';
           return `
             <div class="planner-day-card" data-day="${day}">
-              <div class="planner-day-header">
-                <span class="planner-day-name">${day.substring(0, 3)}</span>
-                <span class="planner-day-label">${exercises.length} lifts</span>
+              <div class="planner-day-header" style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2xs); border: none; padding-bottom: var(--space-xs); margin-bottom: var(--space-sm);">
+                <div class="flex justify-between items-center w-full">
+                  <span class="planner-day-name" style="font-weight: 800; font-size: var(--font-size-md);">${day.substring(0, 3)}</span>
+                  <span class="planner-day-label">${exercises.length} lifts</span>
+                </div>
+                <button class="planner-day-focus-badge" data-day="${day}" style="border: 1px solid var(--border-subtle); background: rgba(255,255,255,0.02); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 10px; padding: 3px 6px; cursor: pointer; text-align: left; width: 100%; transition: all var(--duration-fast);">
+                  🎯 Focus: ${focusStr}
+                </button>
               </div>
               
               <div class="planner-day-content">
@@ -117,15 +156,15 @@ async function renderContent(container) {
     </div>
   `;
 
-  bindEvents(container);
+  bindEvents(container, currentRoutine);
 }
 
-function bindEvents(container) {
+function bindEvents(container, currentRoutine) {
   // Rename Routine
   const renameBtn = document.getElementById('btn-rename-routine');
   if (renameBtn) {
     renameBtn.addEventListener('click', async () => {
-      const newName = prompt("Enter new name for your training split:", "My Weekly Split");
+      const newName = prompt("Enter new name for your training split:", currentRoutine.name);
       if (newName && newName.trim()) {
         await db.plannerRoutines.update(selectedRoutineId, { name: newName.trim() });
         renderContent(container);
@@ -140,6 +179,14 @@ function bindEvents(container) {
       openTemplatePicker(container);
     });
   }
+
+  // Focus Badge Clicks
+  container.querySelectorAll('.planner-day-focus-badge').forEach(badge => {
+    badge.addEventListener('click', () => {
+      const day = badge.getAttribute('data-day');
+      openDayFocusModal(container, day, currentRoutine);
+    });
+  });
 
   // Add Lift Button clicks
   container.querySelectorAll('.planner-day-add-btn').forEach(btn => {
@@ -161,11 +208,85 @@ function bindEvents(container) {
   });
 }
 
+// Day Focus Selector Modal (Part-wise / Bipart combinations)
+function openDayFocusModal(container, day, routine) {
+  const commonOptions = [
+    // Single Muscle Focus (Part-wise)
+    'Chest Focus', 'Back Focus', 'Legs Focus', 'Shoulders Focus', 'Arms Focus', 'Core Focus',
+    // Bipart / Combination splits
+    'Chest & Shoulders', 'Chest & Triceps', 'Back & Biceps', 'Legs & Core', 'Shoulders & Arms', 
+    'Chest & Back', 'Cardio & Abs', 'Push Day', 'Pull Day', 'Full Body Workout', 'Rest Day'
+  ];
+
+  const currentFocus = (routine.dayLabels && routine.dayLabels[day]) || 'Rest Day';
+
+  const modalHtml = `
+    <div class="flex flex-col gap-md">
+      <p class="text-xs text-secondary">Choose a single-part focus or bipart combination split for ${day.toUpperCase()}:</p>
+      
+      <div class="grid grid-2 gap-xs" style="max-height: 250px; overflow-y: auto; padding: 4px;">
+        ${commonOptions.map(opt => `
+          <button class="btn btn-secondary btn-xs text-left focus-select-btn ${opt === currentFocus ? 'btn-primary' : ''}" data-value="${opt}">
+            ${opt}
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="divider" style="margin: var(--space-xs) 0;"></div>
+
+      <div class="input-group">
+        <label for="custom-focus-input" class="text-xs">Custom Combination (e.g. Legs & Shoulders)</label>
+        <input type="text" id="custom-focus-input" class="input" placeholder="Type custom split..." value="${commonOptions.includes(currentFocus) ? '' : currentFocus}">
+      </div>
+
+      <button class="btn btn-primary btn-block mt-xs" id="btn-save-day-focus">
+        Save Split Target
+      </button>
+    </div>
+  `;
+
+  window.showModal(`Configure ${day.toUpperCase()} Focus`, modalHtml);
+
+  // Bind clicks
+  let selectedFocus = currentFocus;
+  const selectBtns = document.querySelectorAll('.focus-select-btn');
+  selectBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectBtns.forEach(b => b.classList.remove('btn-primary'));
+      btn.classList.add('btn-primary');
+      selectedFocus = btn.getAttribute('data-value');
+      
+      // Clear custom input if clicking preset
+      const customInput = document.getElementById('custom-focus-input');
+      if (customInput) customInput.value = '';
+    });
+  });
+
+  const saveBtn = document.getElementById('btn-save-day-focus');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const customInput = document.getElementById('custom-focus-input');
+      if (customInput && customInput.value.trim()) {
+        selectedFocus = customInput.value.trim();
+      }
+
+      if (!routine.dayLabels) routine.dayLabels = {};
+      routine.dayLabels[day] = selectedFocus;
+
+      // Update routine in DB
+      await db.plannerRoutines.put(routine);
+      window.hideModal();
+      window.showToast('Day Focus Saved', `Target for ${day} set to ${selectedFocus}`, 'success');
+      renderContent(container);
+    });
+  }
+}
+
 // Preset Template Loader Modal
 function openTemplatePicker(container) {
   const modalHtml = `
     <div class="flex flex-col gap-md">
-      <p class="text-sm text-secondary">Loading a preset split will overwrite your current schedule. Choose from standard gym routines below:</p>
+      <p class="text-sm text-secondary">Loading a preset split will overwrite your current schedule and day focus labels. Choose from standard gym routines below:</p>
       
       <div class="flex flex-col gap-sm">
         <button class="btn btn-secondary btn-block text-left" id="preset-ppl">
@@ -188,7 +309,7 @@ function openTemplatePicker(container) {
   const ulBtn = document.getElementById('preset-ul');
   const fbBtn = document.getElementById('preset-fb');
 
-  const loadPreset = async (presetName, exercisesList) => {
+  const loadPreset = async (presetName, exercisesList, dayLabelsPreset) => {
     if (!confirm(`Are you sure you want to load the ${presetName} template? This will clear your current scheduled lifts.`)) return;
     
     // Clear existing routine exercises
@@ -204,7 +325,11 @@ function openTemplatePicker(container) {
       });
     }
 
-    await db.plannerRoutines.update(selectedRoutineId, { name: presetName });
+    await db.plannerRoutines.put({
+      id: selectedRoutineId,
+      name: presetName,
+      dayLabels: dayLabelsPreset
+    });
     window.hideModal();
     window.showToast('Template Loaded', `${presetName} routine generated!`, 'success');
     renderContent(container);
@@ -227,7 +352,15 @@ function openTemplatePicker(container) {
         { day: 'friday', name: 'Dumbbell Hammer Curl', sets: 3, reps: 10, equipment: 'dumbbell' },
         { day: 'saturday', name: 'Barbell Romanian Deadlift', sets: 3, reps: 10, equipment: 'barbell' },
         { day: 'saturday', name: 'Standing Calf Raise', sets: 3, reps: 15, equipment: 'machine' }
-      ]);
+      ], {
+        monday: 'Chest & Shoulders (Push)',
+        tuesday: 'Back & Biceps (Pull)',
+        wednesday: 'Legs Focus',
+        thursday: 'Chest & Shoulders (Push)',
+        friday: 'Back & Biceps (Pull)',
+        saturday: 'Legs & Calves',
+        sunday: 'Rest Day'
+      });
     });
   }
 
@@ -246,7 +379,15 @@ function openTemplatePicker(container) {
         { day: 'friday', name: 'Barbell Back Squat', sets: 3, reps: 10, equipment: 'barbell' },
         { day: 'friday', name: 'Lying Leg Curl', sets: 3, reps: 12, equipment: 'machine' },
         { day: 'friday', name: 'Standing Calf Raise', sets: 3, reps: 15, equipment: 'machine' }
-      ]);
+      ], {
+        monday: 'Upper Body Focus',
+        tuesday: 'Lower Body Focus',
+        wednesday: 'Rest Day',
+        thursday: 'Upper Body Focus',
+        friday: 'Lower Body Focus',
+        saturday: 'Rest Day',
+        sunday: 'Rest Day'
+      });
     });
   }
 
@@ -262,7 +403,15 @@ function openTemplatePicker(container) {
         { day: 'friday', name: 'Barbell Back Squat', sets: 3, reps: 10, equipment: 'barbell' },
         { day: 'friday', name: 'Incline Dumbbell Bench Press', sets: 3, reps: 10, equipment: 'dumbbell' },
         { day: 'friday', name: 'Pullup', sets: 3, reps: 8, equipment: 'bodyweight' }
-      ]);
+      ], {
+        monday: 'Full Body Workout',
+        tuesday: 'Rest Day',
+        wednesday: 'Full Body Workout',
+        thursday: 'Rest Day',
+        friday: 'Full Body Workout',
+        saturday: 'Rest Day',
+        sunday: 'Rest Day'
+      });
     });
   }
 }
