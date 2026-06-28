@@ -127,15 +127,23 @@ function bindCardClicks(container) {
 }
 
 function openVideoModal(ex) {
+  const directLink = ex.videoUrl.replace('/embed/', '/watch?v=');
   const modalHtml = `
     <div class="flex flex-col gap-md">
       <!-- 16:9 Video Container -->
-      <div class="video-container">
+      <div class="video-container" style="margin-bottom: 4px;">
         <iframe src="${ex.videoUrl}?autoplay=1&rel=0" 
                 title="${ex.name} Form Guide"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowfullscreen>
         </iframe>
+      </div>
+      
+      <div class="flex justify-between items-center text-xs text-muted mb-sm" style="padding: 0 2px;">
+        <span>Form Demo Player</span>
+        <a href="${directLink}" target="_blank" rel="noopener" class="text-accent font-bold" style="text-decoration: underline; display: flex; items-center gap: 2px;">
+          🔗 Watch on YouTube
+        </a>
       </div>
       
       <div>

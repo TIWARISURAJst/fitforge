@@ -77,10 +77,26 @@ function renderContent(container) {
           </div>
           
           <div class="input-row">
-            <div class="input-group">
-              <label for="settings-height">Height (${user.units === 'metric' ? 'cm' : 'inches'})</label>
-              <input type="number" id="settings-height" class="input" value="${displayHeight}">
-            </div>
+            ${user.units === 'metric' ? `
+              <div class="input-group">
+                <label for="settings-height">Height (cm)</label>
+                <input type="number" id="settings-height" class="input" value="${displayHeight}">
+              </div>
+            ` : `
+              <div class="input-group">
+                <label>Height</label>
+                <div class="flex gap-sm">
+                  <div style="flex: 1;">
+                    <input type="number" id="settings-height-ft" class="input" min="3" max="8" value="${Math.floor((user.height / 2.54) / 12)}">
+                    <span class="text-2xs text-muted">Feet</span>
+                  </div>
+                  <div style="flex: 1;">
+                    <input type="number" id="settings-height-in" class="input" min="0" max="11" value="${Math.round((user.height / 2.54) % 12)}">
+                    <span class="text-2xs text-muted">Inches</span>
+                  </div>
+                </div>
+              </div>
+            `}
             
             <div class="input-group">
               <label for="settings-weight">Weight (${user.units === 'metric' ? 'kg' : 'lbs'})</label>
@@ -205,7 +221,7 @@ function bindEvents(container) {
       const name = document.getElementById('settings-name').value.trim();
       const age = parseInt(document.getElementById('settings-age').value) || 25;
       const sex = document.getElementById('settings-sex').value;
-      const enteredHeight = parseFloat(document.getElementById('settings-height').value) || 170;
+      const enteredHeight = document.getElementById('settings-height') ? parseFloat(document.getElementById('settings-height').value) || 170 : 170;
       const enteredWeight = parseFloat(document.getElementById('settings-weight').value) || 70;
       const goal = document.getElementById('settings-goal').value;
       const activityLevel = document.getElementById('settings-activity').value;
@@ -218,7 +234,9 @@ function bindEvents(container) {
       let height = enteredHeight;
       let weight = enteredWeight;
       if (store.state.user.units === 'imperial') {
-        height = Math.round(enteredHeight * 2.54);
+        const ft = document.getElementById('settings-height-ft') ? parseInt(document.getElementById('settings-height-ft').value) || 5 : 5;
+        const inch = document.getElementById('settings-height-in') ? parseInt(document.getElementById('settings-height-in').value) || 0 : 0;
+        height = Math.round(((ft * 12) + inch) * 2.54);
         weight = Math.round(enteredWeight / 2.20462 * 10) / 10;
       }
       

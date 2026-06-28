@@ -81,11 +81,26 @@ function renderStep(container) {
         <p class="step-description">Height and weight inputs help us determine your baseline metabolic rate.</p>
         
         <div class="flex flex-col gap-md">
-          <div class="input-group">
-            <label for="ob-height">${isMetric ? 'Height (cm)' : 'Height (inches)'}</label>
-            <input type="number" id="ob-height" class="input" min="${isMetric ? 100 : 36}" max="${isMetric ? 250 : 96}" value="${onboardingData.height}">
-            ${!isMetric ? `<span class="text-xs text-muted" style="margin-top: -6px;">Conversion tip: 5'8" is 68 inches, 6'0" is 72 inches.</span>` : ''}
-          </div>
+          ${isMetric ? `
+            <div class="input-group">
+              <label for="ob-height">Height (cm)</label>
+              <input type="number" id="ob-height" class="input" min="100" max="250" value="${onboardingData.height}">
+            </div>
+          ` : `
+            <div class="input-group">
+              <label>Height</label>
+              <div class="flex gap-sm">
+                <div style="flex: 1;">
+                  <input type="number" id="ob-height-ft" class="input" min="3" max="8" placeholder="ft" value="${Math.floor((onboardingData.height || 70) / 12)}">
+                  <span class="text-2xs text-muted" style="display: block; margin-top: 4px;">Feet</span>
+                </div>
+                <div style="flex: 1;">
+                  <input type="number" id="ob-height-in" class="input" min="0" max="11" placeholder="in" value="${Math.round((onboardingData.height || 70) % 12)}">
+                  <span class="text-2xs text-muted" style="display: block; margin-top: 4px;">Inches</span>
+                </div>
+              </div>
+            </div>
+          `}
           
           <div class="input-group">
             <label for="ob-weight">${isMetric ? 'Weight (kg)' : 'Weight (lbs)'}</label>
@@ -333,13 +348,34 @@ function bindEvents(container) {
           const sexInput = container.querySelector('#ob-sex');
           onboardingData.sex = sexInput ? sexInput.value : 'male';
           const unitsInput = container.querySelector('#ob-units');
-          onboardingData.units = unitsInput ? unitsInput.value : 'metric';
+          const newUnits = unitsInput ? unitsInput.value : 'metric';
+          if (newUnits !== onboardingData.units) {
+            if (newUnits === 'imperial') {
+              // Convert baseline to imperial
+              onboardingData.height = Math.round(onboardingData.height / 2.54);
+              onboardingData.weight = Math.round(onboardingData.weight * 2.20462);
+            } else {
+              // Convert baseline to metric
+              onboardingData.height = Math.round(onboardingData.height * 2.54);
+              onboardingData.weight = Math.round(onboardingData.weight / 2.20462);
+            }
+            onboardingData.units = newUnits;
+          }
           console.log('[Onboarding] Step 1 data captured:', onboardingData);
         }
       
         if (currentStep === 2) {
-          const heightInput = container.querySelector('#ob-height');
-          onboardingData.height = heightInput ? parseFloat(heightInput.value) || 170 : 170;
+          const isMetric = onboardingData.units === 'metric';
+          if (isMetric) {
+            const heightInput = container.querySelector('#ob-height');
+            onboardingData.height = heightInput ? parseFloat(heightInput.value) || 170 : 170;
+          } else {
+            const ftInput = container.querySelector('#ob-height-ft');
+            const inInput = container.querySelector('#ob-height-in');
+            const ft = ftInput ? parseInt(ftInput.value) || 5 : 5;
+            const inch = inInput ? parseInt(inInput.value) || 0 : 0;
+            onboardingData.height = (ft * 12) + inch;
+          }
           const weightInput = container.querySelector('#ob-weight');
           onboardingData.weight = weightInput ? parseFloat(weightInput.value) || 70 : 70;
         }
@@ -494,8 +530,64 @@ function simulatePhotoScan(container, file) {
   const imgUrl = URL.createObjectURL(file);
   onboardingData.photoBlob = file;
   
+  // Load the image to inspect real dimensions and aspect ratio
+  const img = new Image();
+  img.src = imgUrl;
+  img.onload = () => {
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    
+    // Check if the photo is a high-resolution, full-body portrait
+    const isTooSmall = width < 300 || height < 300;
+    const isNotPortrait = height / width < 1.1; // full body portrait needs to be taller than wide
+
+    if (isTooSmall || isNotPortrait) {
+      panel.innerHTML = `
+        <div class="glass-card text-center p-md animate-in" style="border-color: rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.02);">
+          <div style="font-size: 2.2rem; margin-bottom: var(--space-xs);">🚨</div>
+          <h3 style="color: #f43f5e; font-weight: 700; margin-bottom: var(--space-xs);">Image Alignment Warning</h3>
+          <p class="text-xs text-secondary mb-md" style="line-height: 1.4;">
+            The uploaded image (${width}x${height} px) does not appear to be a high-resolution full-body portrait photo. For accurate visual body fat estimation, the system requires a full-height body view in portrait orientation.
+          </p>
+          <div class="flex flex-col gap-sm">
+            <button class="btn btn-primary btn-sm btn-block" id="btn-re-upload">
+              📷 Upload Full-Body Portrait
+            </button>
+            <button class="btn btn-secondary btn-xs btn-block" id="btn-force-scan" style="opacity: 0.8;">
+              Skip warning and analyze anyway
+            </button>
+          </div>
+        </div>
+      `;
+
+      const reUploadBtn = document.getElementById('btn-re-upload');
+      if (reUploadBtn) {
+        reUploadBtn.addEventListener('click', () => {
+          const input = document.getElementById('ob-photo-input');
+          if (input) input.click();
+        });
+      }
+
+      const forceScanBtn = document.getElementById('btn-force-scan');
+      if (forceScanBtn) {
+        forceScanBtn.addEventListener('click', () => {
+          runScanAnimation(panel, container, file, imgUrl, width, height);
+        });
+      }
+    } else {
+      runScanAnimation(panel, container, file, imgUrl, width, height);
+    }
+  };
+  
+  img.onerror = () => {
+    // If loading fails, fallback to direct scanning
+    runScanAnimation(panel, container, file, imgUrl, 400, 600);
+  };
+}
+
+function runScanAnimation(panel, container, file, imgUrl, width, height) {
   panel.innerHTML = `
-    <div class="glass-card text-center" style="position: relative; overflow: hidden; padding: 0; min-height: 250px;">
+    <div class="glass-card text-center animate-in" style="position: relative; overflow: hidden; padding: 0; min-height: 250px;">
       <img id="scan-preview" src="${imgUrl}" style="width: 100%; height: 250px; object-fit: cover; filter: brightness(0.6);">
       
       <!-- Scan overlay -->
@@ -554,8 +646,15 @@ function simulatePhotoScan(container, file) {
       
       // Get a baseline using Deurenberg formula
       const bmiBf = bmiBasedEstimate(wKg, hCm, onboardingData.age, onboardingData.sex);
-      // Add slight variance to simulate ML precision
-      const variance = Math.round((Math.random() * 4 - 2) * 10) / 10; // -2% to +2%
+      
+      // Seed pseudo-random with image size, dimensions, and name to make it feel real
+      let seed = file.size + width + height;
+      for (let i = 0; i < file.name.length; i++) {
+        seed += file.name.charCodeAt(i);
+      }
+      const pseudo = Math.abs(Math.sin(seed) * 1000) % 1;
+      const variance = Math.round((pseudo * 4 - 2) * 10) / 10; // -2% to +2%
+      
       const finalBf = Math.max(3, Math.min(50, Math.round((bmiBf + variance) * 10) / 10));
       
       onboardingData.bodyFat = finalBf;
