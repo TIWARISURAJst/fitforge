@@ -318,43 +318,43 @@ function renderStep(container) {
 
 function bindEvents(container) {
   // Step navigation buttons
-  const nextBtn = document.getElementById('ob-next-btn');
-  const backBtn = document.getElementById('ob-back-btn');
+  const nextBtn = container.querySelector('#ob-next-btn');
+  const backBtn = container.querySelector('#ob-back-btn');
   
   if (nextBtn) {
     nextBtn.addEventListener('click', async () => {
       console.log('[Onboarding] Next button clicked. Current step:', currentStep);
       try {
         if (currentStep === 1) {
-          const nameInput = document.getElementById('ob-name');
+          const nameInput = container.querySelector('#ob-name');
           onboardingData.name = nameInput ? nameInput.value.trim() || 'Champion' : 'Champion';
-          const ageInput = document.getElementById('ob-age');
+          const ageInput = container.querySelector('#ob-age');
           onboardingData.age = ageInput ? parseInt(ageInput.value) || 25 : 25;
-          const sexInput = document.getElementById('ob-sex');
+          const sexInput = container.querySelector('#ob-sex');
           onboardingData.sex = sexInput ? sexInput.value : 'male';
-          const unitsInput = document.getElementById('ob-units');
+          const unitsInput = container.querySelector('#ob-units');
           onboardingData.units = unitsInput ? unitsInput.value : 'metric';
           console.log('[Onboarding] Step 1 data captured:', onboardingData);
         }
       
-      if (currentStep === 2) {
-        const heightInput = document.getElementById('ob-height');
-        onboardingData.height = heightInput ? parseFloat(heightInput.value) || 170 : 170;
-        const weightInput = document.getElementById('ob-weight');
-        onboardingData.weight = weightInput ? parseFloat(weightInput.value) || 70 : 70;
-      }
-      
-      if (currentStep === 4) {
-        const trainingInput = document.getElementById('ob-training');
-        onboardingData.trainingDays = trainingInput ? parseInt(trainingInput.value) || 4 : 4;
-      }
-      
-      if (currentStep === 5) {
-        const manualBf = document.getElementById('ob-manual-bf');
-        if (manualBf) {
-          onboardingData.bodyFat = Math.max(3, Math.min(55, parseInt(manualBf.value) || 15));
+        if (currentStep === 2) {
+          const heightInput = container.querySelector('#ob-height');
+          onboardingData.height = heightInput ? parseFloat(heightInput.value) || 170 : 170;
+          const weightInput = container.querySelector('#ob-weight');
+          onboardingData.weight = weightInput ? parseFloat(weightInput.value) || 70 : 70;
         }
-      }
+      
+        if (currentStep === 4) {
+          const trainingInput = container.querySelector('#ob-training');
+          onboardingData.trainingDays = trainingInput ? parseInt(trainingInput.value) || 4 : 4;
+        }
+      
+        if (currentStep === 5) {
+          const manualBf = container.querySelector('#ob-manual-bf');
+          if (manualBf) {
+            onboardingData.bodyFat = Math.max(3, Math.min(55, parseInt(manualBf.value) || 15));
+          }
+        }
       
         if (currentStep < totalSteps) {
           currentStep++;
@@ -382,17 +382,17 @@ function bindEvents(container) {
   
   // STEP 3 - Goal & Activity Selectors
   if (currentStep === 3) {
-    document.querySelectorAll('.goal-card').forEach(card => {
+    container.querySelectorAll('.goal-card').forEach(card => {
       card.addEventListener('click', () => {
-        document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
+        container.querySelectorAll('.goal-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         onboardingData.goal = card.getAttribute('data-goal');
       });
     });
     
-    document.querySelectorAll('.activity-option').forEach(option => {
+    container.querySelectorAll('.activity-option').forEach(option => {
       option.addEventListener('click', () => {
-        document.querySelectorAll('.activity-option').forEach(o => o.classList.remove('selected'));
+        container.querySelectorAll('.activity-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
         onboardingData.activityLevel = option.getAttribute('data-activity');
       });
@@ -401,8 +401,8 @@ function bindEvents(container) {
   
   // STEP 4 - Workout training frequency slider & diet chips
   if (currentStep === 4) {
-    const slider = document.getElementById('ob-training');
-    const label = document.getElementById('training-days-val');
+    const slider = container.querySelector('#ob-training');
+    const label = container.querySelector('#training-days-val');
     if (slider && label) {
       slider.addEventListener('input', () => {
         label.textContent = `${slider.value} Days/Week`;
@@ -410,7 +410,7 @@ function bindEvents(container) {
       });
     }
     
-    document.querySelectorAll('.chip').forEach(chip => {
+    container.querySelectorAll('.chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const pref = chip.getAttribute('data-pref');
         if (chip.classList.toggle('selected')) {
@@ -424,9 +424,9 @@ function bindEvents(container) {
   
   // STEP 5 - Photo capture & Navy Method
   if (currentStep === 5) {
-    const uploadZone = document.getElementById('upload-zone');
-    const photoInput = document.getElementById('ob-photo-input');
-    const navyBtn = document.getElementById('calc-navy-btn');
+    const uploadZone = container.querySelector('#upload-zone');
+    const photoInput = container.querySelector('#ob-photo-input');
+    const navyBtn = container.querySelector('#calc-navy-btn');
     
     if (uploadZone && photoInput) {
       uploadZone.addEventListener('click', () => photoInput.click());
@@ -440,9 +440,9 @@ function bindEvents(container) {
     
     if (navyBtn) {
       navyBtn.addEventListener('click', () => {
-        const neckVal = parseFloat(document.getElementById('ob-neck').value) || 38;
-        const waistVal = parseFloat(document.getElementById('ob-waist').value) || 82;
-        const hipEl = document.getElementById('ob-hip');
+        const neckVal = parseFloat(container.querySelector('#ob-neck').value) || 38;
+        const waistVal = parseFloat(container.querySelector('#ob-waist').value) || 82;
+        const hipEl = container.querySelector('#ob-hip');
         const hipVal = hipEl ? parseFloat(hipEl.value) : 94;
         
         onboardingData.neck = neckVal;
@@ -465,7 +465,7 @@ function bindEvents(container) {
         
         if (bfEst) {
           onboardingData.bodyFat = bfEst;
-          const manualBf = document.getElementById('ob-manual-bf');
+          const manualBf = container.querySelector('#ob-manual-bf');
           if (manualBf) manualBf.value = bfEst;
           window.showToast('Navy Method Calculated', `Estimated body fat: ${bfEst}%`, 'success');
         } else {
@@ -476,7 +476,7 @@ function bindEvents(container) {
   }
   
   if (currentStep === 6) {
-    const explainBtn = document.getElementById('onboarding-explain-btn');
+    const explainBtn = container.querySelector('#onboarding-explain-btn');
     if (explainBtn) {
       explainBtn.addEventListener('click', () => {
         showExplanationModal();
