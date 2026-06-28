@@ -53,10 +53,10 @@
   </div>
 
   <script type="module">
-    import { searchFood, getFoodById, IMAGENET_TO_FOOD_MAP } from '/js/data/foodDatabase.js';
-    import { navyMethod, bmiBasedEstimate, calculateComposition, getBFCategory } from '/js/services/bodyFatEstimator.js';
-    import { calculateWeightTrend, calculateActualTDEE } from '/js/ml/trendPredictor.js';
-    import { generateAdaptiveAdvice } from '/js/ml/adaptiveCoach.js';
+    import { searchFood, getFoodById, IMAGENET_TO_FOOD_MAP } from './js/data/foodDatabase.js';
+    import { navyMethod, bmiBasedEstimate, calculateComposition, getBFCategory } from './js/services/bodyFatEstimator.js';
+    import { calculateWeightTrend, calculateActualTDEE } from './js/ml/trendPredictor.js';
+    import { generateAdaptiveAdvice } from './js/ml/adaptiveCoach.js';
 
     const resultsContainer = document.getElementById('test-results');
     let total = 0, passed = 0, failed = 0;

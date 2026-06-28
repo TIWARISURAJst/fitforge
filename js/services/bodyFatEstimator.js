@@ -115,8 +115,8 @@ export function getBFCategory(bodyFat, sex = 'male') {
  */
 export function idealWeightRange(leanMass, targetBfLow = 12, targetBfHigh = 18) {
   return {
-    low: Math.round(leanMass / (1 - targetBfHigh / 100) * 10) / 10,
-    high: Math.round(leanMass / (1 - targetBfLow / 100) * 10) / 10,
+    low: Math.round(leanMass / (1 - targetBfLow / 100) * 10) / 10,
+    high: Math.round(leanMass / (1 - targetBfHigh / 100) * 10) / 10,
   };
 }
 

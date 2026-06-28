@@ -9,10 +9,28 @@ if %errorlevel% equ 0 (
     goto launch
 )
 
-echo Starting background local server...
-:: Run python server in a minimized background shell
-start /min "" python -m http.server 8000
+:: Check for python
+where python >nul 2>nul
+if %errorlevel% equ 0 (
+    echo Starting background local server via Python...
+    start /min "" python -m http.server 8000
+    goto wait_and_launch
+)
 
+:: Check for node
+where node >nul 2>nul
+if %errorlevel% equ 0 (
+    echo Starting background local server via Node.js...
+    start /min "" node server.mjs
+    goto wait_and_launch
+)
+
+echo ERROR: Neither Python nor Node.js was found in your PATH.
+echo Please install Node.js or Python to run FitForge locally.
+pause
+exit
+
+:wait_and_launch
 :: Give the server a second to boot up
 timeout /t 2 /nobreak >nul
 
