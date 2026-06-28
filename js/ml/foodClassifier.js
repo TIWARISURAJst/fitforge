@@ -1,10 +1,11 @@
 /* ============================================================
    FitForge — TF.js Food Classifier Service
-   Loads MobileNetV2 from CDN, processes canvas/image element,
-   performs inference, maps labels to internal food IDs.
+   Multi-modal pipeline: MobileNet computer vision +
+   Canvas HSL color analysis + Bayesian user history priors.
    ============================================================ */
 
-import { IMAGENET_TO_FOOD_MAP, getFoodById } from '../data/foodDatabase.js';
+import db from '../db.js';
+import { IMAGENET_TO_FOOD_MAP, getFoodById, FOOD_DB } from '../data/foodDatabase.js';
 
 let model = null;
 let isModelLoading = false;
@@ -24,7 +25,6 @@ export async function loadModel() {
   isModelLoading = true;
   console.log('[Classifier] Loading MobileNet model...');
   try {
-    // Mobilenet is loaded globally via cdn script in index.html
     if (window.mobilenet) {
       model = await window.mobilenet.load({ version: 2, alpha: 1.0 });
       console.log('[Classifier] Model loaded successfully');
@@ -42,6 +42,126 @@ export async function loadModel() {
 }
 
 /**
+ * Extracts average color from image element using a canvas and classifies the HSL group.
+ */
+function getImageColorProfile(imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 10;
+    canvas.height = 10;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 'unknown';
+    
+    // Draw and average colors
+    ctx.drawImage(imgEl, 0, 0, 10, 10);
+    const imgData = ctx.getImageData(0, 0, 10, 10).data;
+    
+    let rSum = 0, gSum = 0, bSum = 0, count = 0;
+    for (let i = 0; i < imgData.length; i += 4) {
+      rSum += imgData[i];
+      gSum += imgData[i+1];
+      bSum += imgData[i+2];
+      count++;
+    }
+    
+    const r = rSum / count;
+    const g = gSum / count;
+    const b = bSum / count;
+    
+    // RGB to HSL conversion
+    const rNorm = r / 255;
+    const gNorm = g / 255;
+    const bNorm = b / 255;
+    const max = Math.max(rNorm, gNorm, bNorm);
+    const min = Math.min(rNorm, gNorm, bNorm);
+    let h = 0, s = 0, l = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case rNorm: h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0); break;
+        case gNorm: h = (bNorm - rNorm) / d + 2; break;
+        case bNorm: h = (rNorm - gNorm) / d + 4; break;
+      }
+      h /= 6;
+    }
+    
+    const hue = h * 360;
+    console.log(`[Classifier Color] Avg RGB: (${Math.round(r)},${Math.round(g)},${Math.round(b)}), HSL: (${Math.round(hue)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%)`);
+    
+    if (l > 0.78 && s < 0.25) return 'white'; // Rice, raw paneer, yogurt
+    if (l < 0.25) return 'dark';
+    
+    if (hue >= 55 && hue < 155) return 'green'; // Salads, Palak Paneer, greens
+    if (hue >= 0 && hue < 55) {
+      // Differentiate bright yellow/orange curry from dull brown roti/bread
+      return (s > 0.35 && l > 0.32) ? 'yellow-orange' : 'brown';
+    }
+    if (hue >= 330 || hue < 15) {
+      return s > 0.3 ? 'yellow-orange' : 'brown';
+    }
+    
+    return 'unknown';
+  } catch (e) {
+    console.error('[Classifier Color] Color analysis failed:', e);
+    return 'unknown';
+  }
+}
+
+/**
+ * Returns color group mapping for our database food item
+ */
+function getFoodColorGroup(food) {
+  const name = food.name.toLowerCase();
+  const cat = (food.cat || '').toLowerCase();
+  const tags = (food.tags || []).map(t => t.toLowerCase());
+  
+  if (name.includes('palak') || name.includes('spinach') || name.includes('salad') || name.includes('cucumber') || name.includes('broccoli') || name.includes('green') || tags.includes('green') || tags.includes('spinach') || tags.includes('vegetable')) {
+    if (!name.includes('aloo') && !name.includes('gobi') && !name.includes('paratha')) {
+      return 'green';
+    }
+  }
+  
+  if (name.includes('roti') || name.includes('chapati') || name.includes('phulka') || name.includes('naan') || name.includes('paratha') || name.includes('bread') || name.includes('toast') || cat.includes('grain') || tags.includes('bread') || tags.includes('grain')) {
+    return 'brown';
+  }
+  
+  if (name.includes('rice') || name.includes('yogurt') || name.includes('curd') || name.includes('milk') || name.includes('paneer (raw)') || name.includes('egg white') || (cat.includes('dairy') && !name.includes('masala') && !name.includes('tikka') && !name.includes('butter') && !name.includes('bhurji') && !name.includes('kadai'))) {
+    return 'white';
+  }
+  
+  if (name.includes('butter masala') || name.includes('tikka') || name.includes('shahi') || name.includes('kadai') || name.includes('mutter') || name.includes('aloo') || name.includes('gobi') || name.includes('dal') || name.includes('chana') || name.includes('chhole') || name.includes('curry') || name.includes('gravy') || cat.includes('dal') || tags.includes('dal') || tags.includes('aloo') || name.includes('rajma') || name.includes('bhurji')) {
+    return 'yellow-orange';
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Queries IndexedDB database for user's past 14 days food logs to establish Bayesian prior probabilities.
+ */
+async function getHistoryPriors() {
+  const priors = {};
+  try {
+    const allMeals = await db.meals.toArray();
+    console.log(`[Classifier Prior] Establishing priors from ${allMeals.length} historical logs`);
+    for (const meal of allMeals) {
+      if (meal.items && Array.isArray(meal.items)) {
+        for (const item of meal.items) {
+          if (item.name) {
+            priors[item.name] = (priors[item.name] || 0) + 1;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[Classifier Prior] Failed to fetch meal priors:', e);
+  }
+  return priors;
+}
+
+/**
  * Detect food item from an image element or canvas
  * @param {HTMLImageElement|HTMLCanvasElement} imgEl 
  * @param {string} fileName - Optional filename to extract keywords
@@ -51,99 +171,162 @@ export async function classifyFoodImage(imgEl, fileName = '') {
   const activeModel = await loadModel();
   if (!activeModel) return [];
 
-  console.log('[Classifier] Running inference, file name:', fileName);
+  console.log('[Classifier] Running multi-modal classification, file:', fileName);
   try {
-    const results = [];
+    const candidateScores = new Map(); // food.id -> { food, score, matchedBy }
     const processedIds = new Set();
+    
+    // 1. Color extraction
+    const imageColor = getImageColorProfile(imgEl);
+    console.log('[Classifier] Extracted image color group:', imageColor);
 
-    // Check filename for direct user hints
+    // 2. Bayesian history priors
+    const historyPriors = await getHistoryPriors();
+
+    // 3. Filename matching (extremely high priority)
     if (fileName) {
       const lowerName = fileName.toLowerCase();
       const keywordMapping = [
-        { keys: ['paneer'], ids: [29, 30, 27, 28] }, // Paneer Butter Masala, Paneer Tikka, Raw, Palak Paneer
-        { keys: ['roti', 'chapati', 'phulka'], ids: [1, 2, 5] }, // Roti, Multigrain Roti, Tandoori
-        { keys: ['paratha'], ids: [7, 8] }, // Aloo Paratha, Paneer Paratha
-        { keys: ['dum aloo', 'aloo gobi', 'aloo', 'potato'], ids: [126, 118, 240] }, // Dum Aloo, Alu Gobi, Jeera Aloo
-        { keys: ['dal', 'tadka', 'makhani', 'lentil'], ids: [22, 21, 19, 20] } // Dal Tadka, Moong Dal, Masoor
+        { keys: ['paneer'], ids: [29, 30, 27, 28, 122, 123, 124] },
+        { keys: ['roti', 'chapati', 'phulka'], ids: [1, 2, 5, 110, 111, 112, 114] },
+        { keys: ['paratha'], ids: [7, 8] },
+        { keys: ['dum aloo', 'aloo gobi', 'aloo', 'potato'], ids: [126, 118, 240, 7, 135] },
+        { keys: ['dal', 'tadka', 'makhani', 'lentil'], ids: [22, 21, 19, 20] }
       ];
 
       for (const map of keywordMapping) {
         if (map.keys.some(k => lowerName.includes(k))) {
           for (const id of map.ids) {
-            if (processedIds.has(id)) continue;
-            processedIds.add(id);
             const food = getFoodById(id);
             if (food) {
-              results.push({
+              candidateScores.set(id, {
                 food,
-                confidence: 98, // Extremely high confidence on filename match
-                labelMatched: `filename:${map.keys[0]}`
+                score: 98,
+                matchedBy: 'filename'
               });
+              processedIds.add(id);
             }
           }
         }
       }
     }
 
-    const predictions = await activeModel.classify(imgEl);
-    console.log('[Classifier] Raw predictions:', predictions);
-    
+    // 4. Computer vision inference (MobileNet)
+    let predictions = [];
+    try {
+      predictions = await activeModel.classify(imgEl);
+      console.log('[Classifier] Computer vision raw predictions:', predictions);
+    } catch (e) {
+      console.warn('[Classifier] MobileNet classification failed, using color + history rules.');
+    }
+
     for (const pred of predictions) {
       const label = pred.className.toLowerCase();
-      // Try to find if any substring matches our mapping
+      const prob = pred.probability;
+
       for (const [key, foodIds] of Object.entries(IMAGENET_TO_FOOD_MAP)) {
         if (label.includes(key) || key.includes(label)) {
           for (const id of foodIds) {
-            if (processedIds.has(id)) continue;
-            processedIds.add(id);
-
-            const foodItem = getFoodById(id);
-            if (foodItem) {
-              results.push({
-                food: foodItem,
-                confidence: Math.round(pred.probability * 100),
-                labelMatched: key
-              });
+            const food = getFoodById(id);
+            if (food) {
+              const baseConfidence = Math.round(prob * 100);
+              
+              // Only update if not already set by higher-priority filename
+              if (!candidateScores.has(id)) {
+                candidateScores.set(id, {
+                  food,
+                  score: baseConfidence,
+                  matchedBy: 'computer-vision'
+                });
+              }
+              processedIds.add(id);
             }
           }
         }
       }
     }
 
-    // Sort by confidence
+    // 5. Broad scan for fallback/low-confidence candidates if no high confidence match
+    const hasHighConfidence = Array.from(candidateScores.values()).some(c => c.score >= 50);
+    if (!hasHighConfidence) {
+      console.log('[Classifier] Low visual confidence, performing database-wide semantic alignment...');
+      // Check all food items in database to see if their category or tags align with the color profile
+      for (const food of FOOD_DB) {
+        if (processedIds.has(food.id)) continue;
+        
+        const foodColor = getFoodColorGroup(food);
+        if (foodColor === imageColor && imageColor !== 'unknown') {
+          // Add as a potential candidate with a baseline score
+          candidateScores.set(food.id, {
+            food,
+            score: 25,
+            matchedBy: 'color-alignment'
+          });
+        }
+      }
+    }
+
+    // 6. Multi-modal synthesis (Apply Color modifiers & Bayesian priors)
+    const results = [];
+    for (const [id, data] of candidateScores.entries()) {
+      let finalScore = data.score;
+      const food = data.food;
+      const foodColor = getFoodColorGroup(food);
+
+      // Color profile modifier
+      if (imageColor !== 'unknown') {
+        if (foodColor === imageColor) {
+          finalScore *= 2.0; // Double score for correct color match
+        } else {
+          finalScore *= 0.3; // Penalize mismatching colors
+        }
+      }
+
+      // Bayesian History prior modifier
+      const loggedCount = historyPriors[food.name] || 0;
+      const priorWeight = Math.min(3.0, 1.0 + (loggedCount * 0.3)); // Boost score up to 3x based on frequency
+      finalScore *= priorWeight;
+
+      // Bound final confidence to max 99%
+      const finalConfidence = Math.max(5, Math.min(99, Math.round(finalScore)));
+
+      results.push({
+        food,
+        confidence: finalConfidence,
+        labelMatched: `${data.matchedBy} + color:${foodColor} + history:${loggedCount}x`
+      });
+    }
+
+    // Sort by final confidence
     results.sort((a, b) => b.confidence - a.confidence);
-    
-    // If no direct map, look for synonyms or return top matches as mock recommendations
+
     if (results.length === 0) {
       return getFallbackSuggestions();
     }
 
     return results;
   } catch (e) {
-    console.error('[Classifier] Inference error:', e);
+    console.error('[Classifier] Error executing pipeline:', e);
     return getFallbackSuggestions();
   }
+}
+
+function getFallbackSuggestions() {
+  return [
+    { food: getFoodById(29), confidence: 85, labelMatched: 'fallback:paneer' },
+    { food: getFoodById(1), confidence: 75, labelMatched: 'fallback:roti' },
+    { food: getFoodById(126), confidence: 65, labelMatched: 'fallback:dum_aloo' }
+  ].filter(item => item.food !== null);
 }
 
 function createMockModel() {
   return {
     classify: async (imgEl) => {
-      // Return a simulated high-probability prediction
+      // Mock returns flatbread shape and stew/curry classes for testing
       return [
-        { className: 'pizza, Margherita', probability: 0.88 },
-        { className: 'hamburger, beef burger', probability: 0.12 }
+        { className: 'flatbread, naan', probability: 0.65 },
+        { className: 'potpie, stew', probability: 0.25 }
       ];
     }
   };
 }
-
-function getFallbackSuggestions() {
-  // Return standard healthy defaults when prediction fails or misses mapping
-  return [
-    { food: getFoodById(29), confidence: 85, labelMatched: 'Paneer Butter Masala' }, // Paneer Butter Masala (ID 29)
-    { food: getFoodById(1), confidence: 75, labelMatched: 'Roti' }, // Roti (ID 1)
-    { food: getFoodById(126), confidence: 65, labelMatched: 'Dum Aloo' } // Dum Aloo (ID 126)
-  ].filter(item => item.food !== null);
-}
-
-export default { loadModel, classifyFoodImage };

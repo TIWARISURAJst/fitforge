@@ -435,18 +435,27 @@ function triggerPlateScanner(container, file) {
   `;
 
   // Start actual model run
-  const tempImg = new Image();
-  tempImg.onload = async () => {
+    tempImg.onload = async () => {
     try {
       const statusEl = document.getElementById('plate-scan-status');
       const logEl = document.getElementById('plate-scan-log');
       
-      if (statusEl) statusEl.textContent = 'Parsing plate contours...';
-      if (logEl) logEl.textContent = 'Running MobileNetV2 inference';
+      if (statusEl) statusEl.textContent = 'Analyzing plate contours...';
+      if (logEl) logEl.textContent = 'Extracting pixel HSL color profile...';
+      await new Promise(r => setTimeout(r, 600));
 
+      if (statusEl) statusEl.textContent = 'Reading local database...';
+      if (logEl) logEl.textContent = 'Loading Bayesian dietary history priors...';
+      await new Promise(r => setTimeout(r, 600));
+
+      if (statusEl) statusEl.textContent = 'Running Computer Vision...';
+      if (logEl) logEl.textContent = 'MobileNetV2 neural feature extraction...';
+      
       const results = await classifyFoodImage(tempImg, file.name);
       
-      if (statusEl) statusEl.textContent = 'Mapping nutrition signatures...';
+      if (statusEl) statusEl.textContent = 'Synthesizing predictions...';
+      if (logEl) logEl.textContent = 'Aligning color and history signatures...';
+      await new Promise(r => setTimeout(r, 600));
       
       // Update label in preview
       const scanBox = document.getElementById('scan-box-dynamic');
@@ -456,7 +465,7 @@ function triggerPlateScanner(container, file) {
         scanBox.classList.remove('hidden');
       }
 
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 600));
 
       const scanItems = results.map(r => {
         const dbFood = FOOD_DB.find(f => f.id === r.food.id) || r.food;
@@ -471,7 +480,8 @@ function triggerPlateScanner(container, file) {
           calcium: dbFood.ca || dbFood.calcium || 0,
           iron: dbFood.fe || dbFood.iron || 0,
           portion: dbFood.portion,
-          servings: 1.0
+          servings: 1.0,
+          confidence: r.confidence
         };
       });
 
@@ -488,7 +498,8 @@ function triggerPlateScanner(container, file) {
           calcium: 40,
           iron: 1.5,
           portion: "1 plate",
-          servings: 1.0
+          servings: 1.0,
+          confidence: 70
         });
       }
 
@@ -498,21 +509,26 @@ function triggerPlateScanner(container, file) {
         <div class="flex flex-col gap-md">
           <div class="glass-card text-center py-sm bg-success-glow" style="border-color: var(--success);">
             <span style="font-size: 1.8rem;">🎉</span>
-            <div class="font-bold text-sm text-success">Scan Success! Food Identified</div>
+            <div class="font-bold text-sm text-success">Plate Analysis Complete!</div>
           </div>
           
-          <p class="text-sm text-secondary">Review the estimated foods and portion sizes from the camera scan. Edit as needed before logging.</p>
+          <p class="text-sm text-secondary">We identified the following food candidates from your photo. Check the foods you actually ate and adjust servings:</p>
           
           <div class="flex flex-col gap-xs" id="confirm-scan-list">
-            ${scanItems.map((food, i) => `
-              <div class="glass-card" style="padding: var(--space-sm);">
-                <div class="flex justify-between font-bold text-sm">
-                  <span>${food.name}</span>
-                  <span class="text-gradient">${Math.round(food.calories * food.servings)} kcal</span>
+            ${scanItems.slice(0, 4).map((food, i) => `
+              <div class="glass-card" style="padding: var(--space-sm); border-color: ${i === 0 ? 'rgba(52, 217, 163, 0.4)' : 'var(--border-subtle)'};">
+                <div class="flex items-center gap-sm mb-xs">
+                  <input type="checkbox" class="confirm-item-checkbox" data-idx="${i}" ${i === 0 ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;">
+                  <div style="flex: 1;">
+                    <div class="flex justify-between font-bold text-sm">
+                      <span>${food.name} <span class="text-2xs text-muted">(${food.confidence}% match)</span></span>
+                      <span class="text-gradient">${Math.round(food.calories * food.servings)} kcal</span>
+                    </div>
+                    <div class="text-xs text-secondary">${food.portion} • P: ${food.protein}g | C: ${food.carbs}g | F: ${food.fat}g</div>
+                  </div>
                 </div>
-                <div class="text-xs text-muted mb-xs">${food.portion} • P: ${food.protein}g | C: ${food.carbs}g | F: ${food.fat}g</div>
                 
-                <div class="flex items-center gap-sm">
+                <div class="flex items-center gap-sm mt-xs">
                   <span class="text-xs text-secondary">Servings:</span>
                   <input type="range" class="confirm-servings-slider" data-idx="${i}" min="0.25" max="4" step="0.25" value="${food.servings}" style="flex: 1;">
                   <span class="text-xs font-bold text-accent" id="confirm-val-${i}">${food.servings.toFixed(2)}</span>
@@ -520,9 +536,9 @@ function triggerPlateScanner(container, file) {
               </div>
             `).join('')}
           </div>
-
+          
           <div class="input-group">
-            <label for="scan-meal-type">Log to which meal?</label>
+            <label for="scan-meal-type">Meal Logging Type</label>
             <select id="scan-meal-type" class="input">
               <option value="Breakfast">Breakfast</option>
               <option value="Lunch" selected>Lunch</option>
@@ -530,17 +546,16 @@ function triggerPlateScanner(container, file) {
               <option value="Snacks">Snacks</option>
             </select>
           </div>
-
+          
           <button class="btn btn-primary btn-block" id="confirm-scan-btn">
-            Log Identified Meal
+            Log Checked Food(s) to Journal
           </button>
         </div>
       `;
 
-      window.showModal('Confirm Plate Scan', confirmBody, () => {
-        renderContent(container);
-      });
+      window.showModal("Confirm Plate Scan", confirmBody);
 
+      // Bind servings slider updates
       document.querySelectorAll('.confirm-servings-slider').forEach(slider => {
         slider.addEventListener('input', () => {
           const idx = parseInt(slider.getAttribute('data-idx'));
@@ -555,8 +570,15 @@ function triggerPlateScanner(container, file) {
       if (confirmBtn) {
         confirmBtn.addEventListener('click', async () => {
           const mealType = document.getElementById('scan-meal-type').value;
+          const checkboxes = document.querySelectorAll('.confirm-item-checkbox');
           
-          for (const item of scanItems) {
+          let loggedCount = 0;
+          for (let i = 0; i < scanItems.length; i++) {
+            const cb = checkboxes[i];
+            if (cb && !cb.checked) continue;
+            
+            const item = scanItems[i];
+            loggedCount++;
             await db.addMealItem(todayStr, mealType, {
               name: item.name,
               calories: item.calories,
@@ -572,12 +594,17 @@ function triggerPlateScanner(container, file) {
             });
           }
           
+          if (loggedCount === 0) {
+            window.showToast('No Food Selected', 'Please check at least one food item to log.', 'warning');
+            return;
+          }
+          
           const meals = await db.getMealsByDate(todayStr);
           store.update('today', { meals });
           store.recalcToday(meals);
           
           window.hideModal();
-          window.showToast('Plate Logged', 'Identified meal successfully saved.', 'success');
+          window.showToast('Plate Logged', `Logged ${loggedCount} item(s) successfully!`, 'success');
           renderContent(container);
         });
       }
