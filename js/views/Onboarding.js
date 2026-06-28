@@ -323,16 +323,19 @@ function bindEvents(container) {
   
   if (nextBtn) {
     nextBtn.addEventListener('click', async () => {
-      if (currentStep === 1) {
-        const nameInput = document.getElementById('ob-name');
-        onboardingData.name = nameInput ? nameInput.value.trim() || 'Champion' : 'Champion';
-        const ageInput = document.getElementById('ob-age');
-        onboardingData.age = ageInput ? parseInt(ageInput.value) || 25 : 25;
-        const sexInput = document.getElementById('ob-sex');
-        onboardingData.sex = sexInput ? sexInput.value : 'male';
-        const unitsInput = document.getElementById('ob-units');
-        onboardingData.units = unitsInput ? unitsInput.value : 'metric';
-      }
+      console.log('[Onboarding] Next button clicked. Current step:', currentStep);
+      try {
+        if (currentStep === 1) {
+          const nameInput = document.getElementById('ob-name');
+          onboardingData.name = nameInput ? nameInput.value.trim() || 'Champion' : 'Champion';
+          const ageInput = document.getElementById('ob-age');
+          onboardingData.age = ageInput ? parseInt(ageInput.value) || 25 : 25;
+          const sexInput = document.getElementById('ob-sex');
+          onboardingData.sex = sexInput ? sexInput.value : 'male';
+          const unitsInput = document.getElementById('ob-units');
+          onboardingData.units = unitsInput ? unitsInput.value : 'metric';
+          console.log('[Onboarding] Step 1 data captured:', onboardingData);
+        }
       
       if (currentStep === 2) {
         const heightInput = document.getElementById('ob-height');
@@ -353,12 +356,17 @@ function bindEvents(container) {
         }
       }
       
-      if (currentStep < totalSteps) {
-        currentStep++;
-        renderStep(container);
-      } else {
-        // Complete Onboarding
-        await completeOnboarding();
+        if (currentStep < totalSteps) {
+          currentStep++;
+          console.log('[Onboarding] Proceeding to step:', currentStep);
+          renderStep(container);
+        } else {
+          // Complete Onboarding
+          await completeOnboarding();
+        }
+      } catch (err) {
+        console.error('[Onboarding] Error during continue click:', err);
+        window.showToast('Error', err.message, 'danger');
       }
     });
   }
