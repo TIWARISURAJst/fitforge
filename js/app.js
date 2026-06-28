@@ -100,34 +100,29 @@ window.hideModal = function() {
 
 // ── Global Event Listeners ───────────────────────────────────
 function setupGlobalUIListeners() {
-  const moreTrigger = document.getElementById('more-menu-trigger');
-  const moreMenu = document.getElementById('more-menu');
+  const menuToggleBtn = document.getElementById('menu-toggle-btn');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
   const modalClose = document.getElementById('global-modal-close');
   const modalOverlay = document.getElementById('global-modal-overlay');
   
-  // Toggle More Menu drawer
-  if (moreTrigger && moreMenu) {
-    moreTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = moreMenu.classList.toggle('open');
-      store.state.moreMenuOpen = isOpen;
-      if (isOpen) {
-        moreTrigger.classList.add('active');
-      } else {
-        updateActiveNavTab(store.state.currentView);
-      }
+  // Toggle Sidebar Drawer on mobile
+  if (menuToggleBtn) {
+    menuToggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('sidebar-open');
     });
   }
   
-  // Close More Menu if clicking outside
-  document.addEventListener('click', (e) => {
-    if (moreMenu && moreMenu.classList.contains('open')) {
-      if (!moreMenu.contains(e.target) && !moreTrigger.contains(e.target)) {
-        moreMenu.classList.remove('open');
-        store.state.moreMenuOpen = false;
-        updateActiveNavTab(store.state.currentView);
-      }
-    }
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', () => {
+      document.body.classList.remove('sidebar-open');
+    });
+  }
+  
+  // Close sidebar on mobile navigation
+  document.querySelectorAll('.sidebar-menu .menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.body.classList.remove('sidebar-open');
+    });
   });
   
   // Modal Close buttons
@@ -143,24 +138,15 @@ function setupGlobalUIListeners() {
 
 // ── Update Navigation Highlight ──────────────────────────────
 function updateActiveNavTab(view) {
-  // Remove active state from all items in bottom nav and more menu
-  document.querySelectorAll('.bottom-nav .nav-item, .more-menu .more-menu-item').forEach(el => {
+  // Remove active state from all items in sidebar
+  document.querySelectorAll('.sidebar-menu .menu-item').forEach(el => {
     el.classList.remove('active');
   });
-  
-  // More menu trigger reset
-  const moreTrigger = document.getElementById('more-menu-trigger');
-  if (moreTrigger) moreTrigger.classList.remove('active');
 
   // Activate matching nav link
   const activeEl = document.getElementById(`nav-${view}`);
   if (activeEl) {
     activeEl.classList.add('active');
-    
-    // If active item is in the more menu, also highlight the "More" trigger
-    if (activeEl.classList.contains('more-menu-item') && moreTrigger) {
-      moreTrigger.classList.add('active');
-    }
   }
 }
 
@@ -212,6 +198,30 @@ async function loadTodayData() {
 async function initApp() {
   setupGlobalUIListeners();
   
+  const header = document.getElementById('mobile-header');
+  const sidebar = document.getElementById('sidebar-nav');
+  const layout = document.querySelector('.main-layout');
+
+  function toggleSidebarVisibility(visible) {
+    if (header && sidebar) {
+      if (visible) {
+        header.classList.remove('hidden');
+        sidebar.classList.remove('hidden');
+        if (layout) {
+          layout.style.marginLeft = '';
+          layout.style.paddingTop = '';
+        }
+      } else {
+        header.classList.add('hidden');
+        sidebar.classList.add('hidden');
+        if (layout) {
+          layout.style.marginLeft = '0';
+          layout.style.paddingTop = '0';
+        }
+      }
+    }
+  }
+
   // 1. Fetch user profile from IndexedDB
   const profile = await db.getProfile();
   
@@ -224,54 +234,39 @@ async function initApp() {
     store.state.user.macros = targets.macros;
     store.state.user.tdee = targets.tdee;
     
-    // Show bottom navigation bar
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) bottomNav.classList.remove('hidden-nav');
+    // Show navigation layout
+    toggleSidebarVisibility(true);
     
     // Load daily items
     await loadTodayData();
   } else {
     store.state.isOnboarded = false;
-    // Keep bottom nav hidden for onboarding
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) bottomNav.classList.add('hidden-nav');
+    // Hide navigation layout for onboarding
+    toggleSidebarVisibility(false);
   }
   
   // 2. Set store listeners for UI updates
   store.on('currentView', (newView) => {
-    // Hide bottom nav in onboarding view
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) {
-      if (newView === 'onboarding') {
-        bottomNav.classList.add('hidden-nav');
-      } else {
-        bottomNav.classList.remove('hidden-nav');
-      }
+    // Hide navigation in onboarding view
+    if (newView === 'onboarding') {
+      toggleSidebarVisibility(false);
+    } else {
+      toggleSidebarVisibility(true);
     }
     
     // Update active visual navigation highlight
     updateActiveNavTab(newView);
-    
-    // Close More menu drawer when changing views
-    const moreMenu = document.getElementById('more-menu');
-    if (moreMenu) {
-      moreMenu.classList.remove('open');
-      store.state.moreMenuOpen = false;
-    }
     
     // Close modal if open
     window.hideModal();
   });
 
   store.on('isOnboarded', (isOnboarded) => {
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) {
-      if (isOnboarded) {
-        bottomNav.classList.remove('hidden-nav');
-        loadTodayData();
-      } else {
-        bottomNav.classList.add('hidden-nav');
-      }
+    if (isOnboarded) {
+      toggleSidebarVisibility(true);
+      loadTodayData();
+    } else {
+      toggleSidebarVisibility(false);
     }
   });
   

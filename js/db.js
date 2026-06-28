@@ -47,6 +47,11 @@ db.version(1).stores({
   dailySummaries: 'date'
 });
 
+db.version(2).stores({
+  plannerRoutines: '++id, name',
+  plannerExercises: '++id, routineId, dayOfWeek'
+});
+
 // ── Helper Methods ──────────────────────────────────────────
 
 /**
@@ -235,6 +240,34 @@ db.importAll = async function(data) {
       }
     }
   });
+};
+
+/**
+ * Get planner exercises for a routine and day of week
+ */
+db.getPlannerExercises = async function(routineId, dayOfWeek) {
+  return await this.plannerExercises
+    .where({ routineId: parseInt(routineId), dayOfWeek: parseInt(dayOfWeek) })
+    .toArray();
+};
+
+/**
+ * Add planner exercise
+ */
+db.addPlannerExercise = async function(routineId, dayOfWeek, exercise) {
+  return await this.plannerExercises.add({
+    routineId: parseInt(routineId),
+    dayOfWeek: parseInt(dayOfWeek),
+    ...exercise,
+    createdAt: new Date().toISOString()
+  });
+};
+
+/**
+ * Delete planner exercise
+ */
+db.removePlannerExercise = async function(id) {
+  await this.plannerExercises.delete(parseInt(id));
 };
 
 export default db;

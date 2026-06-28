@@ -2537,3 +2537,416 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
   body::before { animation: none; }
 }
+
+/* ============================================================
+   33. RESPONSIVE SIDEBAR & HEADER LAYOUT OVERHAUL
+   ============================================================ */
+:root {
+  --sidebar-width: 280px;
+  --header-height: 56px;
+}
+
+/* Mobile Header */
+.mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: rgba(10, 10, 20, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-md);
+  z-index: 550;
+}
+
+.mobile-header .logo {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.menu-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  transition: background var(--duration-fast);
+}
+
+.menu-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.user-avatar-small {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: var(--text-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+}
+
+/* Sidebar Navigation */
+.sidebar-nav {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  background: rgba(10, 10, 20, 0.95);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  z-index: 600;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.sidebar-logo-container {
+  padding: var(--space-lg) var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-logo-container .logo {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.sidebar-logo-container .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sidebar-menu {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md) var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sidebar-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  transition: all var(--duration-fast);
+}
+
+.sidebar-menu .menu-item svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--text-muted);
+  transition: stroke var(--duration-fast);
+}
+
+.sidebar-menu .menu-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.sidebar-menu .menu-item:hover svg {
+  stroke: var(--text-primary);
+}
+
+.sidebar-menu .menu-item.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding-left: calc(var(--space-md) - 3px);
+}
+
+.sidebar-menu .menu-item.active svg {
+  stroke: var(--accent);
+}
+
+/* Sidebar Overlay */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 590;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+/* Main Layout content */
+.main-layout {
+  min-height: 100vh;
+  min-height: 100dvh;
+  transition: padding var(--duration-base);
+}
+
+/* Responsive Rules for Layout Switch */
+@media (max-width: 767px) {
+  .sidebar-nav {
+    transform: translateX(-100%);
+  }
+  
+  body.sidebar-open .sidebar-nav {
+    transform: translateX(0);
+  }
+  
+  body.sidebar-open .sidebar-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .main-layout {
+    padding-top: calc(var(--header-height) + var(--space-md));
+    padding-bottom: var(--space-xl);
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-header {
+    display: none;
+  }
+  
+  .sidebar-overlay {
+    display: none;
+  }
+  
+  .main-layout {
+    margin-left: var(--sidebar-width);
+    padding-top: var(--space-xl);
+    padding-bottom: var(--space-2xl);
+  }
+  
+  .sidebar-nav {
+    transform: translateX(0) !important;
+  }
+}
+
+/* ============================================================
+   34. MICRONUTRIENT DISPLAY WIDGETS
+   ============================================================ */
+.micro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.micro-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.micro-name {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-xs);
+}
+
+.micro-value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+}
+
+.micro-progress-container {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.micro-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+/* Custom micro colors */
+.micro-card[data-micro="fiber"] .micro-progress-bar {
+  background: var(--success);
+}
+.micro-card[data-micro="sodium"] .micro-progress-bar {
+  background: var(--warning);
+}
+.micro-card[data-micro="calcium"] .micro-progress-bar {
+  background: var(--accent);
+}
+.micro-card[data-micro="iron"] .micro-progress-bar {
+  background: #f43f5e; /* Rose */
+}
+
+/* ============================================================
+   35. EXERCISE DEMOS VIDEO EMBED
+   ============================================================ */
+.video-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+  height: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-md);
+  background: #000;
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.exercise-safety-box {
+  background: rgba(244, 63, 94, 0.06);
+  border-left: 4px solid #f43f5e;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.exercise-safety-box h4 {
+  color: #f43f5e;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ============================================================
+   36. WORKOUT PLANNER UI
+   ============================================================ */
+.planner-week-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+@media (min-width: 992px) {
+  .planner-week-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--space-sm);
+  }
+}
+
+.planner-day-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  transition: all var(--duration-fast);
+}
+
+.planner-day-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.planner-day-header {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.planner-day-name {
+  text-transform: capitalize;
+}
+
+.planner-day-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.planner-day-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.planner-exercise-tag {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  padding: 6px var(--space-sm);
+  border-radius: var(--radius-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.planner-exercise-delete {
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.planner-exercise-delete:hover {
+  color: #f43f5e;
+}
+
+.planner-day-add-btn {
+  border: 1px dashed var(--border-subtle);
+  background: none;
+  color: var(--text-muted);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  margin-top: var(--space-sm);
+  transition: all var(--duration-fast);
+}
+
+.planner-day-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+

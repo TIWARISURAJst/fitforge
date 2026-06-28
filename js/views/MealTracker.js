@@ -19,7 +19,11 @@ const FOOD_DATABASE = FOOD_DB.map(f => ({
   carbs: f.c,
   fat: f.f,
   portion: f.portion,
-  id: f.id
+  id: f.id,
+  fiber: f.fi || 0,
+  sodium: f.na || 0,
+  calcium: f.ca || 0,
+  iron: f.fe || 0
 }));
 
 
@@ -61,8 +65,50 @@ function renderContent(container) {
     <div class="container view" id="meals-view">
       <div class="view-header">
         <div>
-          <h1>Meal <span class="text-gradient">Tracker</span></h1>
-          <div class="subtitle">Log food, scan plates, and track macros</div>
+          <h1>Meal & <span class="text-gradient">Macros</span></h1>
+          <div class="subtitle">Log food, scan plates, and track nutrition targets</div>
+        </div>
+      </div>
+
+      <!-- Micronutrients Card -->
+      <div class="glass-card mb-lg">
+        <div class="card-header">
+          <div class="card-title">Micronutrient Progress</div>
+          <div class="card-icon" style="background: rgba(124, 58, 237, 0.1); color: var(--accent);">🔬</div>
+        </div>
+        
+        <div class="micro-grid">
+          <div class="micro-card" data-micro="fiber">
+            <div class="micro-name">Fiber</div>
+            <div class="micro-value">${today.fiberConsumed || 0}g / ${store.state.user.macros.fiber || 30}g</div>
+            <div class="micro-progress-container">
+              <div class="micro-progress-bar" style="width: ${Math.min(100, ((today.fiberConsumed || 0) / (store.state.user.macros.fiber || 30)) * 100)}%"></div>
+            </div>
+          </div>
+          
+          <div class="micro-card" data-micro="sodium">
+            <div class="micro-name">Sodium</div>
+            <div class="micro-value">${today.sodiumConsumed || 0}mg / ${store.state.user.macros.sodium || 2300}mg</div>
+            <div class="micro-progress-container">
+              <div class="micro-progress-bar" style="width: ${Math.min(100, ((today.sodiumConsumed || 0) / (store.state.user.macros.sodium || 2300)) * 100)}%"></div>
+            </div>
+          </div>
+          
+          <div class="micro-card" data-micro="calcium">
+            <div class="micro-name">Calcium</div>
+            <div class="micro-value">${today.calciumConsumed || 0}mg / ${store.state.user.macros.calcium || 1000}mg</div>
+            <div class="micro-progress-container">
+              <div class="micro-progress-bar" style="width: ${Math.min(100, ((today.calciumConsumed || 0) / (store.state.user.macros.calcium || 1000)) * 100)}%"></div>
+            </div>
+          </div>
+          
+          <div class="micro-card" data-micro="iron">
+            <div class="micro-name">Iron</div>
+            <div class="micro-value">${today.ironConsumed || 0}mg / ${store.state.user.macros.iron || 8}mg</div>
+            <div class="micro-progress-container">
+              <div class="micro-progress-bar" style="width: ${Math.min(100, ((today.ironConsumed || 0) / (store.state.user.macros.iron || 8)) * 100)}%"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -341,6 +387,10 @@ function openAddFoodModal(mealType) {
           protein: selectedFood.protein,
           carbs: selectedFood.carbs,
           fat: selectedFood.fat,
+          fiber: selectedFood.fiber || 0,
+          sodium: selectedFood.sodium || 0,
+          calcium: selectedFood.calcium || 0,
+          iron: selectedFood.iron || 0,
           portion: selectedFood.portion,
           servings: servings
         });
@@ -408,15 +458,22 @@ function triggerPlateScanner(container, file) {
 
       await new Promise(r => setTimeout(r, 1500));
 
-      const scanItems = results.map(r => ({
-        name: r.food.name,
-        calories: r.food.calories,
-        protein: r.food.protein,
-        carbs: r.food.carbs,
-        fat: r.food.fat,
-        portion: r.food.portion,
-        servings: 1.0
-      }));
+      const scanItems = results.map(r => {
+        const dbFood = FOOD_DB.find(f => f.id === r.food.id) || r.food;
+        return {
+          name: dbFood.name,
+          calories: dbFood.cal || dbFood.calories,
+          protein: dbFood.p || dbFood.protein,
+          carbs: dbFood.c || dbFood.carbs,
+          fat: dbFood.f || dbFood.fat,
+          fiber: dbFood.fi || dbFood.fiber || 0,
+          sodium: dbFood.na || dbFood.sodium || 0,
+          calcium: dbFood.ca || dbFood.calcium || 0,
+          iron: dbFood.fe || dbFood.iron || 0,
+          portion: dbFood.portion,
+          servings: 1.0
+        };
+      });
 
       // Fallback if no foods found
       if (scanItems.length === 0) {
@@ -426,6 +483,10 @@ function triggerPlateScanner(container, file) {
           protein: 4,
           carbs: 12,
           fat: 8,
+          fiber: 4,
+          sodium: 120,
+          calcium: 40,
+          iron: 1.5,
           portion: "1 plate",
           servings: 1.0
         });
@@ -502,6 +563,10 @@ function triggerPlateScanner(container, file) {
               protein: item.protein,
               carbs: item.carbs,
               fat: item.fat,
+              fiber: item.fiber || 0,
+              sodium: item.sodium || 0,
+              calcium: item.calcium || 0,
+              iron: item.iron || 0,
               portion: item.portion,
               servings: item.servings
             });

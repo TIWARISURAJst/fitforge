@@ -24,61 +24,82 @@
 </head>
 <body>
 
-  <!-- App Wrapper -->
-  <div id="app">
-    <!-- View content is injected here by the router -->
-    <div class="container flex justify-center items-center" style="min-height: 80dvh;">
-      <div class="spinner"></div>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation Bar -->
-  <nav class="bottom-nav hidden-nav" id="bottom-nav">
-    <a href="#dashboard" class="nav-item active" id="nav-dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      <span>Dashboard</span>
-    </a>
-    <a href="#meals" class="nav-item" id="nav-meals">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
-      <span>Meals</span>
-    </a>
-    <a href="#workout" class="nav-item" id="nav-workout">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
-      <span>Workout</span>
-    </a>
-    <button class="nav-item" id="more-menu-trigger">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-      <span>More</span>
+  <!-- Mobile Top Header -->
+  <header class="mobile-header" id="mobile-header">
+    <button class="menu-toggle-btn" id="menu-toggle-btn" aria-label="Toggle Navigation">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-  </nav>
+    <div class="logo">Fit<span class="text-gradient">Forge</span></div>
+    <div class="header-right">
+      <div class="user-avatar-small" id="header-avatar">F</div>
+    </div>
+  </header>
 
-  <!-- More Drawer Menu (Auxiliary views grid) -->
-  <div class="more-menu" id="more-menu">
-    <div class="more-menu-grid">
-      <a href="#body" class="more-menu-item" id="nav-body">
+  <!-- Sidebar Overlay for mobile -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Sidebar Navigation Panel -->
+  <aside class="sidebar-nav" id="sidebar-nav">
+    <div class="sidebar-logo-container">
+      <div class="logo">Fit<span class="text-gradient">Forge</span></div>
+      <div class="subtitle">Your Fitness Command Center</div>
+    </div>
+    
+    <nav class="sidebar-menu">
+      <a href="#dashboard" class="menu-item active" id="nav-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#meals" class="menu-item" id="nav-meals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+        <span>Meals & Macros</span>
+      </a>
+      <a href="#workout" class="menu-item" id="nav-workout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        <span>Workout Log</span>
+      </a>
+      <a href="#planner" class="menu-item" id="nav-planner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+        <span>Workout Planner</span>
+      </a>
+      <a href="#demos" class="menu-item" id="nav-demos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>Exercise Demos</span>
+      </a>
+      <a href="#body" class="menu-item" id="nav-body">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/></svg>
-        <span>Body Fat</span>
+        <span>Body Fat Photo</span>
       </a>
-      <a href="#sleep" class="more-menu-item" id="nav-sleep">
+      <a href="#sleep" class="menu-item" id="nav-sleep">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <span>Sleep</span>
+        <span>Sleep Tracker</span>
       </a>
-      <a href="#hydration" class="more-menu-item" id="nav-hydration">
+      <a href="#hydration" class="menu-item" id="nav-hydration">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-        <span>Water</span>
+        <span>Water Hydration</span>
       </a>
-      <a href="#schedule" class="more-menu-item" id="nav-schedule">
+      <a href="#schedule" class="menu-item" id="nav-schedule">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>Schedule</span>
+        <span>Schedule Daily</span>
       </a>
-      <a href="#photos" class="more-menu-item" id="nav-photos">
+      <a href="#photos" class="menu-item" id="nav-photos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        <span>Photos</span>
+        <span>Progress Photos</span>
       </a>
-      <a href="#settings" class="more-menu-item" id="nav-settings">
+      <a href="#settings" class="menu-item" id="nav-settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Settings</span>
       </a>
+    </nav>
+  </aside>
+
+  <!-- App Wrapper and Main Layout container -->
+  <div class="main-layout">
+    <div id="app">
+      <!-- View content is injected here by the router -->
+      <div class="container flex justify-center items-center" style="min-height: 80dvh;">
+        <div class="spinner"></div>
+      </div>
     </div>
   </div>
 

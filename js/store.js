@@ -67,7 +67,7 @@ const store = {
       dietPreferences: [],
       units: 'metric',     // metric or imperial
       tdee: 0,
-      macros: { protein: 0, carbs: 0, fat: 0, calories: 0 }
+      macros: { protein: 0, carbs: 0, fat: 0, calories: 0, fiber: 30, sodium: 2300, calcium: 1000, iron: 8 }
     },
 
     // Today's data
@@ -81,7 +81,11 @@ const store = {
       caloriesConsumed: 0,
       proteinConsumed: 0,
       carbsConsumed: 0,
-      fatConsumed: 0
+      fatConsumed: 0,
+      fiberConsumed: 0,
+      sodiumConsumed: 0,
+      calciumConsumed: 0,
+      ironConsumed: 0
     },
 
     // UI state
@@ -150,11 +154,9 @@ const store = {
     }
   },
 
-  /**
-   * Update today's nutrition totals from meals
-   */
   recalcToday(meals) {
     let calories = 0, protein = 0, carbs = 0, fat = 0;
+    let fiber = 0, sodium = 0, calcium = 0, iron = 0;
     meals.forEach(meal => {
       if (meal.items) {
         meal.items.forEach(item => {
@@ -163,6 +165,10 @@ const store = {
           protein += (item.protein || 0) * mult;
           carbs += (item.carbs || 0) * mult;
           fat += (item.fat || 0) * mult;
+          fiber += (item.fiber || item.fi || 0) * mult;
+          sodium += (item.sodium || item.na || 0) * mult;
+          calcium += (item.calcium || item.ca || 0) * mult;
+          iron += (item.iron || item.fe || 0) * mult;
         });
       }
     });
@@ -170,7 +176,11 @@ const store = {
       caloriesConsumed: Math.round(calories),
       proteinConsumed: Math.round(protein),
       carbsConsumed: Math.round(carbs),
-      fatConsumed: Math.round(fat)
+      fatConsumed: Math.round(fat),
+      fiberConsumed: Math.round(fiber * 10) / 10,
+      sodiumConsumed: Math.round(sodium),
+      calciumConsumed: Math.round(calcium),
+      ironConsumed: Math.round(iron * 10) / 10
     });
   }
 };
