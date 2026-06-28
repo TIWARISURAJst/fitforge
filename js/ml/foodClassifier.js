@@ -191,7 +191,11 @@ export async function classifyFoodImage(imgEl, fileName = '') {
         { keys: ['roti', 'chapati', 'phulka'], ids: [1, 2, 5, 110, 111, 112, 114] },
         { keys: ['paratha'], ids: [7, 8] },
         { keys: ['dum aloo', 'aloo gobi', 'aloo', 'potato'], ids: [126, 118, 240, 7, 135] },
-        { keys: ['dal', 'tadka', 'makhani', 'lentil'], ids: [22, 21, 19, 20] }
+        { keys: ['dal', 'tadka', 'makhani', 'lentil'], ids: [22, 21, 19, 20] },
+        { keys: ['juice', 'fruit juice', 'pineapple juice', 'orange juice', 'apple juice', 'watermelon juice', 'sugarcane'], ids: [301, 302, 303, 304, 252, 253] },
+        { keys: ['shake', 'smoothie', 'mango shake', 'banana shake'], ids: [305, 306] },
+        { keys: ['protein', 'whey'], ids: [307, 308] },
+        { keys: ['lassi', 'chaas', 'buttermilk'], ids: [309, 310] }
       ];
 
       for (const map of keywordMapping) {

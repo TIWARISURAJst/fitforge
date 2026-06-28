@@ -245,9 +245,6 @@ function renderStep(container) {
     
     onboardingData.tdee = calculated.tdee;
     onboardingData.macros = calculated.macros;
-    
-    const bfRange = getBFCategory(onboardingData.bodyFat, onboardingData.sex);
-    
     stepContent = `
       <div class="animate-in">
         <h1>Your Forge is <span class="text-gradient">Ready</span>!</h1>
@@ -256,10 +253,10 @@ function renderStep(container) {
         <div class="flex flex-col gap-md">
           <div class="glass-card card-accent text-center">
             <span class="text-sm text-secondary text-transform-uppercase font-semibold">Daily Calorie Target</span>
-            <div class="text-gradient font-bold" style="font-size: var(--font-4xl); line-height: 1.2;">
+            <div class="text-gradient font-bold" style="font-size: var(--font-4xl); line-height: 1.2;" id="ob-cal-val">
               ${calculated.macros.calories} <span class="text-md font-medium text-secondary">kcal</span>
             </div>
-            <p class="text-xs text-muted mt-xs">TDEE Baseline: ${calculated.tdee} kcal/day</p>
+            <p class="text-xs text-muted mt-xs" id="ob-tdee-val">TDEE Baseline: ${calculated.tdee} kcal/day</p>
             <button class="btn btn-ghost btn-sm" id="onboarding-explain-btn" style="padding: 4px; font-size: var(--font-xs); margin-top: 6px; color: var(--accent); display: inline-flex; align-items: center; gap: 4px; width: auto; text-decoration: underline; margin-left: auto; margin-right: auto;">
               ❓ Learn how these are calculated
             </button>
@@ -271,30 +268,38 @@ function renderStep(container) {
             <div class="flex flex-col gap-sm">
               <div class="progress-label">
                 <span class="progress-name">Protein (Build & Repair)</span>
-                <span class="progress-value text-accent font-bold">${calculated.macros.protein}g</span>
+                <span class="progress-value text-accent font-bold" id="ob-protein-val">${calculated.macros.protein}g</span>
               </div>
               <div class="progress-bar mb-xs"><div class="progress-bar-fill fill-protein" style="width: 35%"></div></div>
               
               <div class="progress-label">
                 <span class="progress-name">Carbohydrates (Energy)</span>
-                <span class="progress-value text-warning font-bold">${calculated.macros.carbs}g</span>
+                <span class="progress-value text-warning font-bold" id="ob-carbs-val">${calculated.macros.carbs}g</span>
               </div>
               <div class="progress-bar mb-xs"><div class="progress-bar-fill fill-carbs" style="width: 45%"></div></div>
               
               <div class="progress-label">
                 <span class="progress-name">Fats (Hormones & Health)</span>
-                <span class="progress-value text-danger font-bold">${calculated.macros.fat}g</span>
+                <span class="progress-value text-danger font-bold" id="ob-fat-val">${calculated.macros.fat}g</span>
               </div>
               <div class="progress-bar"><div class="progress-bar-fill fill-fat" style="width: 20%"></div></div>
             </div>
           </div>
           
-          <div class="glass-card flex items-center justify-between">
-            <div>
-              <div class="font-bold text-sm">Estimated Body Fat: ${onboardingData.bodyFat}%</div>
-              <div class="text-xs text-muted">${bfRange.emoji} Category: ${bfRange.label} — ${bfRange.desc}</div>
+          <div class="glass-card flex flex-col gap-sm">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-bold text-sm" id="ob-bf-category">${bfRange.emoji} Category: ${bfRange.label}</div>
+                <div class="text-xs text-muted" id="ob-bf-desc">${bfRange.desc}</div>
+              </div>
+              <div class="flex items-center gap-xs">
+                <input type="number" id="ob-bf-override" class="input font-bold text-center text-sm" value="${onboardingData.bodyFat}" style="width: 70px; padding: var(--space-2xs);" min="3" max="50" step="0.5">
+                <span class="text-xs font-bold text-secondary">%</span>
+              </div>
             </div>
-            <span class="badge badge-accent">Verified</span>
+            <p class="text-2xs text-muted" style="line-height: 1.3;">
+              * If you feel the photo-estimated body fat percentage is inaccurate (due to camera lighting or posture angle), you can adjust it here.
+            </p>
           </div>
         </div>
       </div>
@@ -518,6 +523,54 @@ function bindEvents(container) {
         showExplanationModal();
       });
     }
+
+    const bfOverride = container.querySelector('#ob-bf-override');
+    if (bfOverride) {
+      bfOverride.addEventListener('input', () => {
+        let val = parseFloat(bfOverride.value);
+        if (isNaN(val)) return;
+        if (val < 3) val = 3;
+        if (val > 50) val = 50;
+
+        onboardingData.bodyFat = val;
+
+        // Recalculate macros and targets in real time
+        let weightKg = onboardingData.weight;
+        let heightCm = onboardingData.height;
+        if (onboardingData.units === 'imperial') {
+          weightKg = onboardingData.weight / 2.20462;
+          heightCm = onboardingData.height * 2.54;
+        }
+
+        const calculated = calculateAllTargets({
+          ...onboardingData,
+          weight: weightKg,
+          height: heightCm
+        });
+
+        // Update elements
+        const calVal = container.querySelector('#ob-cal-val');
+        if (calVal) calVal.innerHTML = `${calculated.macros.calories} <span class="text-md font-medium text-secondary">kcal</span>`;
+
+        const tdeeVal = container.querySelector('#ob-tdee-val');
+        if (tdeeVal) tdeeVal.textContent = `TDEE Baseline: ${calculated.tdee} kcal/day`;
+
+        const pVal = container.querySelector('#ob-protein-val');
+        if (pVal) pVal.textContent = `${calculated.macros.protein}g`;
+
+        const cVal = container.querySelector('#ob-carbs-val');
+        if (cVal) cVal.textContent = `${calculated.macros.carbs}g`;
+
+        const fVal = container.querySelector('#ob-fat-val');
+        if (fVal) fVal.textContent = `${calculated.macros.fat}g`;
+
+        const bfRange = getBFCategory(onboardingData.bodyFat, onboardingData.sex);
+        const bfCatEl = container.querySelector('#ob-bf-category');
+        const bfDescEl = container.querySelector('#ob-bf-desc');
+        if (bfCatEl) bfCatEl.textContent = `${bfRange.emoji} Category: ${bfRange.label}`;
+        if (bfDescEl) bfDescEl.textContent = bfRange.desc;
+      });
+    }
   }
 }
 
@@ -571,21 +624,74 @@ function simulatePhotoScan(container, file) {
       const forceScanBtn = document.getElementById('btn-force-scan');
       if (forceScanBtn) {
         forceScanBtn.addEventListener('click', () => {
-          runScanAnimation(panel, container, file, imgUrl, width, height);
+          runScanAnimation(panel, container, file, imgUrl, width, height, img);
         });
       }
     } else {
-      runScanAnimation(panel, container, file, imgUrl, width, height);
+      runScanAnimation(panel, container, file, imgUrl, width, height, img);
     }
   };
   
   img.onerror = () => {
-    // If loading fails, fallback to direct scanning
-    runScanAnimation(panel, container, file, imgUrl, 400, 600);
+    runScanAnimation(panel, container, file, imgUrl, 400, 600, null);
   };
 }
 
-function runScanAnimation(panel, container, file, imgUrl, width, height) {
+function analyzePhotoQuality(imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 10;
+    canvas.height = 10;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { lighting: 'Optimal', contrast: 'Good', alignment: 'Resolved' };
+    
+    ctx.drawImage(imgEl, 0, 0, 10, 10);
+    const data = ctx.getImageData(0, 0, 10, 10).data;
+    
+    let sum = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i+1], b = data[i+2];
+      sum += (r + g + b) / 3;
+      count++;
+    }
+    
+    const avgBrightness = sum / count;
+    let lighting = 'Optimal';
+    if (avgBrightness < 65) lighting = 'Sub-optimal (Dark) ⚠️';
+    else if (avgBrightness > 215) lighting = 'Sub-optimal (Overexposed) ⚠️';
+    
+    let leftSum = 0, centerSum = 0, rightSum = 0;
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const idx = (y * 10 + x) * 4;
+        const b = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+        if (x < 3) leftSum += b;
+        else if (x > 6) rightSum += b;
+        else centerSum += b;
+      }
+    }
+    
+    const leftAvg = leftSum / 30;
+    const rightAvg = rightSum / 30;
+    const centerAvg = centerSum / 40;
+    const deviation = Math.abs((leftAvg + rightAvg) / 2 - centerAvg);
+    
+    let alignment = 'Silhouette Center Resolved';
+    if (deviation < 10) {
+      alignment = 'Low Posture Contrast ⚠️';
+    }
+    
+    return {
+      lighting,
+      contrast: avgBrightness > 100 && avgBrightness < 180 ? 'Optimal' : 'Sufficient',
+      alignment
+    };
+  } catch (e) {
+    return { lighting: 'Optimal', contrast: 'Good', alignment: 'Resolved' };
+  }
+}
+
+function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) {
   panel.innerHTML = `
     <div class="glass-card text-center animate-in" style="position: relative; overflow: hidden; padding: 0; min-height: 250px;">
       <img id="scan-preview" src="${imgUrl}" style="width: 100%; height: 250px; object-fit: cover; filter: brightness(0.6);">
@@ -602,7 +708,6 @@ function runScanAnimation(panel, container, file, imgUrl, width, height) {
     </div>
   `;
   
-  // Inject laser animation style
   if (!document.getElementById('laser-style')) {
     const style = document.createElement('style');
     style.id = 'laser-style';
@@ -616,11 +721,13 @@ function runScanAnimation(panel, container, file, imgUrl, width, height) {
     document.head.appendChild(style);
   }
   
+  const quality = imgEl ? analyzePhotoQuality(imgEl) : { lighting: 'Sufficient', contrast: 'Good', alignment: 'Resolved' };
+  
   // Simulated steps of scanner
   const steps = [
     { text: 'Registering alignment grids...', log: 'Aligning front torso profile' },
-    { text: 'Analyzing waist-to-neck ratio...', log: 'Computing skeletal indicators' },
-    { text: 'Finalizing neural approximation...', log: 'Calculating adipose tissue ratio' }
+    { text: 'Analyzing lighting & contrast...', log: `Lighting: ${quality.lighting} | Contrast: ${quality.contrast}` },
+    { text: 'Analyzing body posture...', log: `Postural Alignment: ${quality.alignment}` }
   ];
   
   let currentSubStep = 0;

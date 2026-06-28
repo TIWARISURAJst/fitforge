@@ -457,6 +457,164 @@ function triggerPlateScanner(container, file) {
       if (logEl) logEl.textContent = 'Aligning color and history signatures...';
       await new Promise(r => setTimeout(r, 600));
       
+      const isLowConfidence = results.length === 0 || results[0].confidence < 40 || results[0].labelMatched.includes('fallback:');
+
+      if (isLowConfidence) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const confirmBody = `
+          <div class="flex flex-col gap-md">
+            <div class="glass-card text-center py-sm" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03);">
+              <span style="font-size: 1.8rem;">🔍</span>
+              <div class="font-bold text-sm text-danger" style="margin-top: 4px;">Food Not Recognized</div>
+              <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; padding: 0 var(--space-xs);">
+                We were not able to recognize the food in this photo with high confidence. Please search and select the item manually below.
+              </p>
+            </div>
+            
+            <div class="input-group relative" style="margin-bottom: var(--space-xs);">
+              <label class="text-xs font-bold text-secondary">Search Food Item</label>
+              <input type="text" id="manual-scan-search" class="input" placeholder="Type to search (e.g. Orange Juice, Roti)..." style="margin-top: var(--space-2xs);" autocomplete="off">
+              <div id="manual-scan-results" class="hidden" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: rgba(20,20,35,0.98); position: absolute; left: 0; right: 0; top: 100%; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(10px);"></div>
+            </div>
+
+            <div class="glass-card hidden" id="manual-scan-selected-card" style="padding: var(--space-sm); border-color: var(--accent);">
+              <div class="flex justify-between font-bold text-sm">
+                <span id="manual-selected-name">Selected Food</span>
+                <span class="text-gradient" id="manual-selected-cal">0 kcal</span>
+              </div>
+              <div class="text-xs text-secondary mb-sm" id="manual-selected-macros">Portion info</div>
+              
+              <div class="flex items-center gap-sm">
+                <span class="text-xs text-secondary">Servings:</span>
+                <input type="range" id="manual-selected-servings-slider" min="0.25" max="4" step="0.25" value="1.0" style="flex: 1;">
+                <span class="text-xs font-bold text-accent" id="manual-selected-servings-val">1.00</span>
+              </div>
+            </div>
+            
+            <div class="input-group">
+              <label for="scan-meal-type">Meal Logging Type</label>
+              <select id="scan-meal-type" class="input">
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch" selected>Lunch</option>
+                <option value="Dinner">Dinner</option>
+                <option value="Snacks">Snacks</option>
+              </select>
+            </div>
+            
+            <button class="btn btn-primary btn-block disabled" id="confirm-manual-scan-btn" disabled style="opacity: 0.5; pointer-events: none;">
+              Log Selected Food
+            </button>
+          </div>
+        `;
+
+        window.showModal("Confirm Plate Scan", confirmBody);
+
+        let selectedFood = null;
+        let currentServings = 1.0;
+
+        const searchInput = document.getElementById('manual-scan-search');
+        const resultsDiv = document.getElementById('manual-scan-results');
+        const selectedCard = document.getElementById('manual-scan-selected-card');
+        const confirmManualBtn = document.getElementById('confirm-manual-scan-btn');
+
+        if (searchInput && resultsDiv) {
+          searchInput.addEventListener('input', () => {
+            const query = searchInput.value;
+            if (!query || query.length < 2) {
+              resultsDiv.innerHTML = '';
+              resultsDiv.classList.add('hidden');
+              return;
+            }
+
+            const matches = searchFood(query);
+            if (matches.length === 0) {
+              resultsDiv.innerHTML = `<div style="padding: var(--space-sm); font-size: 0.8rem; color: var(--text-muted); text-align: center;">No matches found</div>`;
+              resultsDiv.classList.remove('hidden');
+              return;
+            }
+
+            resultsDiv.innerHTML = matches.map(food => `
+              <div class="manual-search-item" data-id="${food.id}" style="padding: var(--space-sm); cursor: pointer; border-bottom: 1px solid var(--border-subtle); font-size: 0.8rem;">
+                <div class="font-bold flex justify-between">
+                  <span>${food.emoji || '🍽️'} ${food.name}</span>
+                  <span class="text-accent">${food.cal || food.calories} kcal</span>
+                </div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${food.portion} • P: ${food.p || food.protein}g | C: ${food.c || food.carbs}g | F: ${food.f || food.fat}g</div>
+              </div>
+            `).join('');
+            resultsDiv.classList.remove('hidden');
+
+            document.querySelectorAll('.manual-search-item').forEach(item => {
+              item.addEventListener('click', () => {
+                const foodId = parseInt(item.getAttribute('data-id'));
+                const found = FOOD_DB.find(f => f.id === foodId);
+                if (found) {
+                  selectedFood = found;
+                  currentServings = 1.0;
+                  
+                  document.getElementById('manual-selected-name').textContent = selectedFood.name;
+                  document.getElementById('manual-selected-cal').textContent = `${Math.round((selectedFood.cal || selectedFood.calories) * currentServings)} kcal`;
+                  document.getElementById('manual-selected-macros').textContent = `${selectedFood.portion} • P: ${selectedFood.p || selectedFood.protein}g | C: ${selectedFood.c || selectedFood.carbs}g | F: ${selectedFood.f || selectedFood.fat}g`;
+                  
+                  const slider = document.getElementById('manual-selected-servings-slider');
+                  if (slider) slider.value = 1.0;
+                  const valSpan = document.getElementById('manual-selected-servings-val');
+                  if (valSpan) valSpan.textContent = "1.00";
+
+                  selectedCard.classList.remove('hidden');
+                  confirmManualBtn.removeAttribute('disabled');
+                  confirmManualBtn.classList.remove('disabled');
+                  confirmManualBtn.style.opacity = '1';
+                  confirmManualBtn.style.pointerEvents = 'auto';
+                  resultsDiv.classList.add('hidden');
+                  searchInput.value = selectedFood.name;
+                }
+              });
+            });
+          });
+        }
+
+        const manualSlider = document.getElementById('manual-selected-servings-slider');
+        if (manualSlider) {
+          manualSlider.addEventListener('input', () => {
+            if (!selectedFood) return;
+            currentServings = parseFloat(manualSlider.value);
+            document.getElementById('manual-selected-servings-val').textContent = currentServings.toFixed(2);
+            document.getElementById('manual-selected-cal').textContent = `${Math.round((selectedFood.cal || selectedFood.calories) * currentServings)} kcal`;
+          });
+        }
+
+        if (confirmManualBtn) {
+          confirmManualBtn.addEventListener('click', async () => {
+            if (!selectedFood) return;
+            const mealType = document.getElementById('scan-meal-type').value;
+
+            await db.addMealItem(todayStr, mealType, {
+              name: selectedFood.name,
+              calories: selectedFood.cal || selectedFood.calories,
+              protein: selectedFood.p || selectedFood.protein,
+              carbs: selectedFood.c || selectedFood.carbs,
+              fat: selectedFood.f || selectedFood.fat,
+              fiber: selectedFood.fi || selectedFood.fiber || 0,
+              sodium: selectedFood.na || selectedFood.sodium || 0,
+              calcium: selectedFood.ca || selectedFood.calcium || 0,
+              iron: selectedFood.fe || selectedFood.iron || 0,
+              portion: selectedFood.portion,
+              servings: currentServings
+            });
+
+            const meals = await db.getMealsByDate(todayStr);
+            store.update('today', { meals });
+            store.recalcToday(meals);
+            
+            window.hideModal();
+            window.showToast('Plate Logged', `Logged ${selectedFood.name} successfully!`, 'success');
+            renderContent(container);
+          });
+        }
+        return;
+      }
+
       // Update label in preview
       const scanBox = document.getElementById('scan-box-dynamic');
       const scanBoxLabel = document.getElementById('scan-box-label');

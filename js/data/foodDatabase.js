@@ -360,6 +360,18 @@ export const FOOD_DB = [
   { id: 298, name: "Green Chilli Pickle", cal: 35, p: 0.5, c: 1.8, f: 3.0, fi: 0.8, na: 410, ca: 12, fe: 0.4, portion: "1 piece", g: 15, cat: "Beverage", tags: ["indian", "pickle", "spicy"] },
   { id: 299, name: "Mango Pickle", cal: 40, p: 0.4, c: 2.0, f: 3.5, fi: 0.5, na: 450, ca: 10, fe: 0.3, portion: "1 piece", g: 15, cat: "Beverage", tags: ["indian", "pickle"] },
   { id: 300, name: "Lemon Pickle", cal: 25, p: 0.3, c: 4.8, f: 0.5, fi: 1.0, na: 480, ca: 15, fe: 0.3, portion: "1 piece", g: 15, cat: "Beverage", tags: ["indian", "pickle"] },
+  
+  // Newly Added Juices, Shakes, and High-Protein Shakes
+  { id: 301, name: "Pineapple Juice (Fresh)", cal: 120, p: 0.9, c: 28.0, f: 0.3, fi: 0.5, na: 5, ca: 30, fe: 0.3, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["juice", "sweet", "pineapple"] },
+  { id: 302, name: "Mixed Fruit Juice", cal: 115, p: 0.8, c: 27.5, f: 0.2, fi: 0.8, na: 8, ca: 25, fe: 0.4, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["juice", "sweet", "mixed-fruit"] },
+  { id: 303, name: "Watermelon Juice", cal: 75, p: 1.5, c: 17.5, f: 0.4, fi: 1.0, na: 3, ca: 18, fe: 0.6, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["juice", "sweet", "watermelon", "hydration"] },
+  { id: 304, name: "Sugarcane Juice", cal: 180, p: 0.5, c: 45.0, f: 0.1, fi: 1.2, na: 12, ca: 40, fe: 1.1, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["juice", "sweet", "sugarcane"] },
+  { id: 305, name: "Mango Shake", cal: 240, p: 6.0, c: 38.0, f: 7.0, fi: 1.5, na: 75, ca: 180, fe: 0.5, portion: "1 glass (300ml)", g: 300, cat: "Beverage", tags: ["shake", "mango", "sweet", "dairy"] },
+  { id: 306, name: "Banana Shake", cal: 220, p: 6.5, c: 36.0, f: 6.2, fi: 2.2, na: 80, ca: 190, fe: 0.6, portion: "1 glass (300ml)", g: 300, cat: "Beverage", tags: ["shake", "banana", "sweet", "dairy"] },
+  { id: 307, name: "Whey Protein Shake (Water)", cal: 120, p: 25.0, c: 3.0, f: 1.5, fi: 0, na: 130, ca: 140, fe: 0.2, portion: "1 shake (1 scoop)", g: 300, cat: "Beverage", tags: ["shake", "protein", "whey", "fitness"] },
+  { id: 308, name: "Whey Protein Shake (Milk)", cal: 270, p: 33.0, c: 15.0, f: 9.5, fi: 0, na: 230, ca: 420, fe: 0.3, portion: "1 shake (with milk)", g: 350, cat: "Beverage", tags: ["shake", "protein", "whey", "fitness", "dairy"] },
+  { id: 309, name: "Sweet Lassi", cal: 210, p: 5.5, c: 26.0, f: 6.0, fi: 0, na: 95, ca: 150, fe: 0.1, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["indian", "lassi", "sweet", "dairy"] },
+  { id: 310, name: "Masala Buttermilk (Chaas)", cal: 45, p: 2.2, c: 3.6, f: 1.5, fi: 0, na: 310, ca: 85, fe: 0.1, portion: "1 glass (250ml)", g: 250, cat: "Beverage", tags: ["indian", "buttermilk", "chaas", "spicy", "dairy", "low-cal"] },
 ];
 
 /** Search food database */
@@ -439,7 +451,12 @@ export const IMAGENET_TO_FOOD_MAP = {
   
   // Potatoes / Dum Aloo / Gobi
   "mashed potato": [7, 118, 126, 135, 240],
-  "potato":        [7, 118, 126, 135, 240]
+  "potato":        [7, 118, 126, 135, 240],
+  
+  // Juices / Drinks / Shakes
+  "beverage":      [104, 105, 106, 252, 253, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310],
+  "juice":         [252, 253, 301, 302, 303, 304],
+  "pop":           [301, 302, 303, 304, 305, 306]
 };
 
 export default { FOOD_DB, searchFood, getFoodById, getFoodsByCategory, scaledNutrition, IMAGENET_TO_FOOD_MAP };
