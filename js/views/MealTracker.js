@@ -444,7 +444,7 @@ function triggerPlateScanner(container, file) {
       if (statusEl) statusEl.textContent = 'Parsing plate contours...';
       if (logEl) logEl.textContent = 'Running MobileNetV2 inference';
 
-      const results = await classifyFoodImage(tempImg);
+      const results = await classifyFoodImage(tempImg, file.name);
       
       if (statusEl) statusEl.textContent = 'Mapping nutrition signatures...';
       

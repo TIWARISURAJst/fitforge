@@ -420,6 +420,26 @@ export const IMAGENET_TO_FOOD_MAP = {
   "bell pepper":   [86],
   "hen":           [58],
   "ice cream":     [182],
+  
+  // Indian Flatbreads / Roti
+  "flatbread":     [1, 2, 5, 110, 111, 112, 114],
+  "dough":         [1, 2, 5, 110, 111, 112, 114],
+  "bakery":        [1, 2, 5, 110, 111, 112, 114],
+  "potpie":        [7, 8, 28, 29, 126],
+  
+  // Curries / Paneer / Dum Aloo
+  "curry":         [28, 29, 31, 122, 124, 126],
+  "stew":          [19, 20, 21, 22, 23, 24, 126],
+  "soup":          [19, 21, 22, 25, 26],
+  
+  // Paneer/Tofu/Cheese
+  "tofu":          [27, 30, 123],
+  "cheese":        [27, 30, 123],
+  "cottage cheese":[27, 30, 123],
+  
+  // Potatoes / Dum Aloo / Gobi
+  "mashed potato": [7, 118, 126, 135, 240],
+  "potato":        [7, 118, 126, 135, 240]
 };
 
 export default { FOOD_DB, searchFood, getFoodById, getFoodsByCategory, scaledNutrition, IMAGENET_TO_FOOD_MAP };
