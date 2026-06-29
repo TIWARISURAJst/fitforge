@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FitForge — Scanner Visual Rejection Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <style>
+    body { background: #0a0a14; color: #e4e4eb; font-family: sans-serif; padding: 30px; }
+    .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 30px; border-radius: 12px; }
+    h1 { color: #fff; font-weight: 700; margin-top: 0; }
+    .panel { display: flex; gap: 20px; margin-top: 20px; }
+    .image-box { flex: 1; text-align: center; }
+    .image-box img { max-width: 100%; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+    .result-box { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+    .card { background: rgba(255,255,255,0.02); border-left: 4px solid #7c6aff; padding: 15px; border-radius: 4px; }
+    .card.pass { border-left-color: #34d9a3; }
+    .card.fail { border-left-color: #ff5c5c; }
+    .badge { font-weight: bold; padding: 3px 6px; border-radius: 4px; font-size: 0.75rem; }
+    .badge.pass { background: rgba(52, 217, 163, 0.15); color: #34d9a3; }
+    .badge.fail { background: rgba(255, 92, 92, 0.15); color: #ff5c5c; }
+    pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 0.8rem; overflow-x: auto; color: #8a8a9e; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>FitForge Visual Validation Audit</h1>
+    <p style="color:#8a8a9e;">Auditing the user-supplied night scene photo against our CNN and anthropometric validation filters.</p>
+    
+    <div class="panel">
+      <div class="image-box">
+        <h3>Test Image</h3>
+        <img id="audit-img" src="test_image.jpg" alt="Test Image">
+      </div>
+      
+      <div class="result-box" id="audit-results">
+        <p>Loading validation layers...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { classifyFoodImage } from './js/ml/foodClassifier.js';
+    import db from './js/db.js';
+
+    // We will extract the silhouette detection logic directly to test
+    const onboardingCode = await fetch('./js/views/Onboarding.js').then(r => r.text());
+    
+    const startMarker = "function extractSilhouetteMetrics(imgEl, sex) {";
+    const endMarker = "function analyzePhotoQuality(imgEl) {";
+    const startIdx = onboardingCode.indexOf(startMarker);
+    const endIdx = onboardingCode.indexOf(endMarker);
+    const functionBody = onboardingCode.substring(startIdx + startMarker.length, endIdx - 1);
+    
+    const extractSilhouetteMetrics = new Function('imgEl', 'sex', functionBody);
+
+    const img = document.getElementById('audit-img');
+    img.onload = async () => {
+      const resultsDiv = document.getElementById('audit-results');
+      resultsDiv.innerHTML = "<p>Running active validation checks...</p>";
+
+      // 1. Run COCO-SSD object detector
+      let ssdHuman = false;
+      let ssdFood = false;
+      let detections = [];
+      try {
+        const coco = await window.cocoSsd.load();
+        detections = await coco.detect(img);
+        ssdHuman = detections.some(p => p.class === 'person' && p.score >= 0.4);
+        
+        const foodClasses = ['banana', 'apple', 'sandwich', 'orange', 'broccoli', 'hot dog', 'pizza', 'donut', 'cake', 'bowl', 'cup', 'fork', 'knife', 'spoon', 'dining table', 'bottle'];
+        ssdFood = detections.some(p => foodClasses.includes(p.class) && p.score >= 0.35);
+      } catch (e) {
+        console.error("SSD run failed:", e);
+      }
+
+      // 2. Run Silhouette Contours & Anthropometrics Check
+      const cvMetrics = extractSilhouetteMetrics(img, 'male');
+      const cvPassed = cvMetrics !== null;
+
+      // 3. Run Food Classifier Checks
+      const foodResults = await classifyFoodImage(img, 'test_image.jpg');
+      const foodPassed = foodResults.length > 0 && foodResults[0].error !== 'NOT_FOOD';
+
+      resultsDiv.innerHTML = `
+        <div class="card ${!cvPassed ? 'pass' : 'fail'}">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong>1. Body Fat Scanner</strong>
+            <span class="badge ${!cvPassed ? 'pass' : 'fail'}">${!cvPassed ? 'REJECTED (PASS)' : 'ACCEPTED (FAIL)'}</span>
+          </div>
+          <div style="font-size:0.8rem; margin-top:5px; color:#e4e4eb; line-height: 1.4;">
+            <strong>COCO-SSD Person detected:</strong> ${ssdHuman ? "Yes" : "No"}<br>
+            <strong>Anthropometric Contours Resolved:</strong> ${cvPassed ? "Yes" : "No"}<br>
+            <strong>Verdict:</strong> ${!cvPassed ? "<span style='color:#34d9a3;'>✅ Image correctly rejected as non-human standing shape.</span>" : "<span style='color:#ff5c5c;'>❌ ERROR: Image incorrectly accepted as a standing human body.</span>"}
+          </div>
+        </div>
+
+        <div class="card ${!foodPassed ? 'pass' : 'fail'}">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong>2. Plate Food Scanner</strong>
+            <span class="badge ${!foodPassed ? 'pass' : 'fail'}">${!foodPassed ? 'REJECTED (PASS)' : 'ACCEPTED (FAIL)'}</span>
+          </div>
+          <div style="font-size:0.8rem; margin-top:5px; color:#e4e4eb; line-height: 1.4;">
+            <strong>COCO-SSD Food detected:</strong> ${ssdFood ? "Yes" : "No"}<br>
+            <strong>Classifier Result:</strong> ${JSON.stringify(foodResults)}<br>
+            <strong>Verdict:</strong> ${!foodPassed ? "<span style='color:#34d9a3;'>✅ Image correctly rejected as non-food plate.</span>" : "<span style='color:#ff5c5c;'>❌ ERROR: Image incorrectly classified as food.</span>"}
+          </div>
+        </div>
+
+        <h3>Full Bounding Box Detections:</h3>
+        <pre>${JSON.stringify(detections, null, 2)}</pre>
+      `;
+    };
+  </script>
+</body>
+</html>
