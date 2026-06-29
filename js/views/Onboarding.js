@@ -745,11 +745,11 @@ function extractSilhouetteMetrics(imgEl, sex, bbox = null) {
     const hipToWaist = hipWidth / waistWidth;
     const waistToNeck = waistWidth / neckWidth;
     
-    // Strict Anthropometric Shape Auditor
+    // Relaxed Anthropometric Shape Auditor (prevent false rejections on real human photos)
     let isHumanShape = true;
-    if (waistToHeight < 0.12 || waistToHeight > 0.46) isHumanShape = false; // Torso aspect ratio check
-    if (hipToWaist < 0.95 || hipToWaist > 1.9) isHumanShape = false;       // Hip curvature ratio check
-    if (neckWidth >= waistWidth || neckWidth >= hipWidth) isHumanShape = false; // Neck scale verification
+    if (waistToHeight < 0.05 || waistToHeight > 0.65) isHumanShape = false; // Torso aspect ratio check
+    if (hipToWaist < 0.6 || hipToWaist > 2.8) isHumanShape = false;         // Hip curvature ratio check
+    if (neckWidth > waistWidth * 1.6) isHumanShape = false;                 // Neck scale verification
     
     if (!isHumanShape) {
       console.warn('[Contour CV] Anthropometric proportions validation failed. waistToHeight:', waistToHeight.toFixed(2), 'hipToWaist:', hipToWaist.toFixed(2));

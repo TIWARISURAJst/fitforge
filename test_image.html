@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>FitForge — Scanner Visual Rejection Test</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
   <style>
     body { background: #0a0a14; color: #e4e4eb; font-family: sans-serif; padding: 30px; }
     .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 30px; border-radius: 12px; }
@@ -47,7 +47,7 @@
     // We will extract the silhouette detection logic directly to test
     const onboardingCode = await fetch('./js/views/Onboarding.js').then(r => r.text());
     
-    const startMarker = "function extractSilhouetteMetrics(imgEl, sex) {";
+    const startMarker = "function extractSilhouetteMetrics(imgEl, sex, bbox = null) {";
     const endMarker = "function analyzePhotoQuality(imgEl) {";
     const startIdx = onboardingCode.indexOf(startMarker);
     const endIdx = onboardingCode.indexOf(endMarker);
