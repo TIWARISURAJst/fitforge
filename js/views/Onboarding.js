@@ -637,7 +637,7 @@ function simulatePhotoScan(container, file) {
   };
 }
 
-function extractSilhouetteMetrics(imgEl, sex) {
+function extractSilhouetteMetrics(imgEl, sex, bbox = null) {
   try {
     const canvas = document.createElement('canvas');
     canvas.width = 60;
@@ -645,7 +645,11 @@ function extractSilhouetteMetrics(imgEl, sex) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     
-    ctx.drawImage(imgEl, 0, 0, 60, 100);
+    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+      ctx.drawImage(imgEl, bbox[0], bbox[1], bbox[2], bbox[3], 0, 0, 60, 100);
+    } else {
+      ctx.drawImage(imgEl, 0, 0, 60, 100);
+    }
     const imgData = ctx.getImageData(0, 0, 60, 100).data;
     
     // Step 1: Detect background color (take average of 4 corners)
@@ -860,26 +864,123 @@ async function runScanAnimation(panel, container, file, imgUrl, width, height, i
     document.head.appendChild(style);
   }
 
-  // Await COCO-SSD object check to ensure a human standing shape is present
-  let ssdHumanDetected = true;
+  // 1. Await COCO-SSD object check to count people in the image
+  let people = [];
   if (imgEl && window.cocoSsd) {
     try {
-      console.log('[Scanner SSD] Loading COCO-SSD for visual validation...');
+      console.log('[Scanner SSD] Loading COCO-SSD for person check...');
       const cocoModel = await window.cocoSsd.load();
       const detections = await cocoModel.detect(imgEl);
-      console.log('[Scanner SSD] Object detections:', detections);
-      ssdHumanDetected = detections.some(p => p.class === 'person' && p.score >= 0.4);
+      console.log('[Scanner SSD] All detections:', detections);
+      people = detections.filter(p => p.class === 'person' && p.score >= 0.35);
     } catch (e) {
       console.warn('[Scanner SSD] cocoSsd failed, fallback to silhouette contour validation:', e);
     }
   }
-  
+
+  // 2. If multiple people are found, show selection UI with canvas bounding boxes
+  if (people.length >= 2) {
+    console.log('[Scanner SSD] Multiple people detected, prompting user choice.');
+    people.sort((a, b) => a.bbox[0] - b.bbox[0]); // Sort left to right
+    
+    panel.innerHTML = `
+      <div class="glass-card text-center p-md animate-in" style="max-width: 100%;">
+        <div style="font-size: 2.2rem; margin-bottom: var(--space-xs);">👥</div>
+        <h3 style="color: var(--accent); font-weight: 700; margin-bottom: var(--space-xs); font-size: 1.1rem;">Multiple People Detected</h3>
+        <p class="text-xs text-secondary mb-md" style="line-height: 1.4; margin-bottom: var(--space-sm);">
+          We found ${people.length} people in this photo. Please select the correct person you would like to estimate body fat for:
+        </p>
+        
+        <div style="position: relative; display: inline-block; margin-bottom: var(--space-md); border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-subtle); width: 100%; background: #000;">
+          <canvas id="multi-person-canvas" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"></canvas>
+        </div>
+
+        <div class="flex flex-col gap-xs" style="width: 100%;">
+          ${people.map((p, idx) => `
+            <button class="btn btn-secondary btn-sm btn-block select-person-btn" data-idx="${idx}" style="text-align: left; padding: var(--space-sm) var(--space-md); display: flex; justify-content: space-between; align-items: center;">
+              <span>👤 Person ${idx + 1} (${p.bbox[0] < width / 2 ? 'Left Side' : 'Right Side'})</span>
+              <span class="text-2xs text-accent">${Math.round(p.score * 100)}% Match</span>
+            </button>
+          `).join('')}
+          
+          <button class="btn btn-secondary btn-xs mt-xs" id="btn-multi-reupload" style="opacity: 0.8;">
+            📷 Upload Different Photo
+          </button>
+        </div>
+      </div>
+    `;
+
+    const canvas = document.getElementById('multi-person-canvas');
+    if (canvas) {
+      // Calculate scaled aspect ratio for canvas preview
+      const maxW = 320;
+      const scale = Math.min(1, maxW / width);
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+        
+        people.forEach((p, idx) => {
+          const [bx, by, bw, bh] = p.bbox.map(v => v * scale);
+          ctx.strokeStyle = idx === 0 ? '#34d9a3' : '#7c6aff';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(bx, by, bw, bh);
+          
+          ctx.fillStyle = idx === 0 ? '#34d9a3' : '#7c6aff';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText(`Person ${idx + 1}`, bx + 5, by + 15);
+        });
+      }
+    }
+
+    const reUploadBtn = document.getElementById('btn-multi-reupload');
+    if (reUploadBtn) {
+      reUploadBtn.addEventListener('click', () => {
+        const input = document.getElementById('ob-photo-input');
+        if (input) input.click();
+      });
+    }
+
+    document.querySelectorAll('.select-person-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-idx'));
+        const selectedPerson = people[idx];
+        runSinglePersonScan(panel, container, file, imgUrl, width, height, imgEl, selectedPerson.bbox);
+      });
+    });
+    return;
+  }
+
+  // 3. If 0 or 1 person, scan directly
+  const selectedBbox = people.length === 1 ? people[0].bbox : null;
+  runSinglePersonScan(panel, container, file, imgUrl, width, height, imgEl, selectedBbox);
+}
+
+function runSinglePersonScan(panel, container, file, imgUrl, width, height, imgEl, bbox) {
+  panel.innerHTML = `
+    <div class="glass-card text-center animate-in" style="position: relative; overflow: hidden; padding: 0; min-height: 250px;">
+      <img id="scan-preview" src="${imgUrl}" style="width: 100%; height: 250px; object-fit: cover; filter: brightness(0.6);">
+      
+      <!-- Scan overlay -->
+      <div id="laser-line" style="position: absolute; left: 0; right: 0; height: 3px; background: var(--success); top: 0; box-shadow: 0 0 10px var(--success-glow); animation: laserScroll 2s linear infinite;"></div>
+      
+      <!-- scanning indicators -->
+      <div class="flex flex-col items-center justify-center" style="position: absolute; inset: 0; background: rgba(10,10,20,0.4); pointer-events: none;">
+        <div class="spinner mb-sm"></div>
+        <div class="font-bold text-sm text-gradient" id="scan-status">Detecting contours...</div>
+        <div class="text-xs text-muted" id="scan-log">Constructing visual baseline</div>
+      </div>
+    </div>
+  `;
+
   const quality = imgEl ? analyzePhotoQuality(imgEl) : { lighting: 'Sufficient', contrast: 'Good', alignment: 'Resolved' };
-  const cvMetrics = (imgEl && ssdHumanDetected) ? extractSilhouetteMetrics(imgEl, onboardingData.sex) : null;
+  const cvMetrics = imgEl ? extractSilhouetteMetrics(imgEl, onboardingData.sex, bbox) : null;
   
   // Simulated steps of scanner
   const steps = [
-    { text: 'Registering alignment grids...', log: 'Aligning front torso profile...' },
+    { text: 'Registering alignment grids...', log: bbox ? 'ROI cropping and body boundary mapping...' : 'Aligning front torso profile...' },
     { text: 'Analyzing camera environment...', log: `Lighting: ${quality.lighting} | Contrast: ${quality.contrast}` },
     { text: 'Scanning skeletal boundaries...', log: cvMetrics ? `Neck: ${cvMetrics.neckWidth.toFixed(1)}px | Waist: ${cvMetrics.waistWidth.toFixed(1)}px | Hips: ${cvMetrics.hipWidth.toFixed(1)}px` : `Posture: ${quality.alignment}` },
     { text: 'Computing body fat metrics...', log: cvMetrics ? `Waist-to-Height Ratio: ${cvMetrics.waistToHeight.toFixed(2)}` : 'Resolving body composition...' }

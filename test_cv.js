@@ -4,7 +4,7 @@ import fs from 'fs';
 const onboardingCode = fs.readFileSync('js/views/Onboarding.js', 'utf8');
 
 // Extract the extractSilhouetteMetrics function body
-const startMarker = "function extractSilhouetteMetrics(imgEl, sex) {";
+const startMarker = "function extractSilhouetteMetrics(imgEl, sex, bbox = null) {";
 const endMarker = "function analyzePhotoQuality(imgEl) {";
 
 const startIdx = onboardingCode.indexOf(startMarker);
@@ -39,7 +39,7 @@ global.document = {
 };
 
 // Evaluate the function code in the global scope
-const extractSilhouetteMetrics = new Function('imgEl', 'sex', `
+const extractSilhouetteMetrics = new Function('imgEl', 'sex', 'bbox', `
   try {
     ${functionBody.substring(startMarker.length, functionBody.length - 1)}
   } catch(e) {
