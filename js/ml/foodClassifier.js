@@ -297,13 +297,14 @@ export async function classifyFoodImage(imgEl, fileName = '') {
   if (!activeModel) return [];
 
   console.log('[Classifier] Running multi-modal classification, file:', fileName);
+  let predictions = [];
   try {
     // 0. Object detection sanity validation (YOLO-equivalent COCO-SSD check)
     if (window.cocoSsd) {
       try {
         console.log('[Classifier SSD] Loading COCO-SSD to verify food presence...');
         const cocoModel = await window.cocoSsd.load();
-        const predictions = await cocoModel.detect(imgEl);
+        predictions = await cocoModel.detect(imgEl);
         console.log('[Classifier SSD] Detections:', predictions);
         
         const foodClasses = ['banana', 'apple', 'sandwich', 'orange', 'broccoli', 'hot dog', 'pizza', 'donut', 'cake', 'bowl', 'cup', 'fork', 'knife', 'spoon', 'dining table', 'bottle'];
@@ -314,7 +315,9 @@ export async function classifyFoodImage(imgEl, fileName = '') {
         
         if (hasIrrelevantObjects.length > 0 && !hasFoodItem) {
           console.warn('[Classifier SSD] Non-food image detected. Rejecting scan.');
-          return [{ error: 'NOT_FOOD' }];
+          const failRet = [{ error: 'NOT_FOOD' }];
+          failRet.detections = predictions;
+          return failRet;
         }
       } catch (e) {
         console.warn('[Classifier SSD] Food validation check bypassed:', e);
@@ -502,13 +505,18 @@ export async function classifyFoodImage(imgEl, fileName = '') {
     results.sort((a, b) => b.confidence - a.confidence);
 
     if (results.length === 0) {
-      return getFallbackSuggestions();
+      const fallback = getFallbackSuggestions();
+      fallback.detections = predictions;
+      return fallback;
     }
 
+    results.detections = predictions;
     return results;
   } catch (e) {
     console.error('[Classifier] Error executing pipeline:', e);
-    return getFallbackSuggestions();
+    const fallback = getFallbackSuggestions();
+    fallback.detections = predictions;
+    return fallback;
   }
 }
 

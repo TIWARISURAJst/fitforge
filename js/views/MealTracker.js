@@ -8,6 +8,16 @@ import store from '../store.js';
 import { FOOD_DB, searchFood } from '../data/foodDatabase.js';
 import { classifyFoodImage } from '../ml/foodClassifier.js';
 
+function formatDetectionsSummary(detections) {
+  if (!detections || detections.length === 0) return 'No objects recognized';
+  const counts = {};
+  detections.forEach(d => {
+    const key = d.class.toLowerCase();
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  return Object.entries(counts).map(([name, count]) => `${count} ${name}${count > 1 ? 's' : ''}`).join(', ');
+}
+
 let storeUnsubscribe = null;
 let currentActiveMealSection = 'Breakfast';
 
@@ -462,6 +472,7 @@ function triggerPlateScanner(container, file) {
 
       if (isNotFood || isLowConfidence) {
         const todayStr = new Date().toISOString().split('T')[0];
+        const detectionsSummary = formatDetectionsSummary(results.detections);
         
         let headerHtml = '';
         if (isNotFood) {
@@ -470,7 +481,8 @@ function triggerPlateScanner(container, file) {
               <span style="font-size: 1.8rem;">🍽️❌</span>
               <div class="font-bold text-sm text-danger" style="margin-top: 4px; font-weight: 700;">Food Plate Not Detected</div>
               <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; margin: 4px 0 0 0;">
-                The visual analyzer detected non-food items in this photo. Please capture/upload a clear photo of your food, or search manually below:
+                The visual analyzer detected non-food items in this photo.<br>
+                <strong>Detected:</strong> <span class="text-accent">${detectionsSummary}</span>
               </p>
             </div>
           `;
@@ -480,7 +492,8 @@ function triggerPlateScanner(container, file) {
               <span style="font-size: 1.8rem;">🔍</span>
               <div class="font-bold text-sm text-danger" style="margin-top: 4px; font-weight: 700;">Food Not Recognized</div>
               <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; margin: 4px 0 0 0;">
-                We were not able to recognize the food in this photo with high confidence. Please search and select the item manually below.
+                We were not able to recognize the food in this photo with high confidence.<br>
+                <strong>Detected:</strong> <span class="text-accent">${detectionsSummary}</span>
               </p>
             </div>
           `;
