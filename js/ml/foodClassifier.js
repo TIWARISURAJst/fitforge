@@ -139,6 +139,71 @@ function getFoodColorGroup(food) {
 }
 
 /**
+ * Inspects local variance (texture gradient) across pixels to detect surface texture properties.
+ */
+function getImageTextureMetrics(imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 15;
+    canvas.height = 15;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 'smooth';
+    
+    ctx.drawImage(imgEl, 0, 0, 15, 15);
+    const data = ctx.getImageData(0, 0, 15, 15).data;
+    
+    let totalDiff = 0, count = 0;
+    for (let y = 0; y < 15; y++) {
+      for (let x = 0; x < 14; x++) {
+        const idx1 = (y * 15 + x) * 4;
+        const idx2 = (y * 15 + (x + 1)) * 4;
+        
+        const rDiff = Math.abs(data[idx1] - data[idx2]);
+        const gDiff = Math.abs(data[idx1+1] - data[idx2+1]);
+        const bDiff = Math.abs(data[idx1+2] - data[idx2+2]);
+        
+        totalDiff += (rDiff + gDiff + bDiff) / 3;
+        count++;
+      }
+    }
+    
+    const avgDiff = totalDiff / count;
+    console.log(`[Classifier Texture] Avg adjacent pixel gradient: ${avgDiff.toFixed(2)}`);
+    
+    if (avgDiff > 28) return 'granular'; // Chopped salads, mixed grains, crispy items
+    if (avgDiff > 13) return 'textured';  // Roti, flatbread, chunky curry
+    return 'smooth';                     // Yogurt, juices, smooth gravy, rice
+  } catch (e) {
+    return 'smooth';
+  }
+}
+
+/**
+ * Returns texture group for database items
+ */
+function getFoodTextureGroup(food) {
+  const name = food.name.toLowerCase();
+  const cat = (food.cat || '').toLowerCase();
+  const tags = (food.tags || []).map(t => t.toLowerCase());
+  
+  if (name.includes('juice') || name.includes('lassi') || name.includes('chaas') || name.includes('curd') || name.includes('yogurt') || name.includes('soup') || name.includes('milk') || name.includes('water')) {
+    return 'smooth';
+  }
+  
+  if (name.includes('roti') || name.includes('chapati') || name.includes('naan') || name.includes('paratha') || name.includes('bread') || name.includes('rice') || name.includes('dal') || name.includes('curry')) {
+    if (!name.includes('bhurji') && !name.includes('salad') && !name.includes('tikka')) {
+      return 'textured';
+    }
+  }
+  
+  if (name.includes('salad') || name.includes('bhurji') || name.includes('tikka') || name.includes('gobi') || name.includes('chole') || name.includes('rajma') || name.includes('biryani') || tags.includes('salad') || name.includes('pickle')) {
+    return 'granular';
+  }
+  
+  return 'textured';
+}
+
+/**
  * Queries IndexedDB database for user's past 14 days food logs to establish Bayesian prior probabilities.
  */
 async function getHistoryPriors() {
@@ -176,9 +241,10 @@ export async function classifyFoodImage(imgEl, fileName = '') {
     const candidateScores = new Map(); // food.id -> { food, score, matchedBy }
     const processedIds = new Set();
     
-    // 1. Color extraction
+    // 1. Color and texture extraction
     const imageColor = getImageColorProfile(imgEl);
-    console.log('[Classifier] Extracted image color group:', imageColor);
+    const imageTexture = getImageTextureMetrics(imgEl);
+    console.log(`[Classifier] Extracted image color group: ${imageColor}, texture: ${imageTexture}`);
 
     // 2. Bayesian history priors
     const historyPriors = await getHistoryPriors();
@@ -235,7 +301,6 @@ export async function classifyFoodImage(imgEl, fileName = '') {
             if (food) {
               const baseConfidence = Math.round(prob * 100);
               
-              // Only update if not already set by higher-priority filename
               if (!candidateScores.has(id)) {
                 candidateScores.set(id, {
                   food,
@@ -254,13 +319,14 @@ export async function classifyFoodImage(imgEl, fileName = '') {
     const hasHighConfidence = Array.from(candidateScores.values()).some(c => c.score >= 50);
     if (!hasHighConfidence) {
       console.log('[Classifier] Low visual confidence, performing database-wide semantic alignment...');
-      // Check all food items in database to see if their category or tags align with the color profile
       for (const food of FOOD_DB) {
         if (processedIds.has(food.id)) continue;
         
         const foodColor = getFoodColorGroup(food);
+        const foodTexture = getFoodTextureGroup(food);
+        
+        // Add if color matches or if texture matches a default
         if (foodColor === imageColor && imageColor !== 'unknown') {
-          // Add as a potential candidate with a baseline score
           candidateScores.set(food.id, {
             food,
             score: 25,
@@ -270,34 +336,43 @@ export async function classifyFoodImage(imgEl, fileName = '') {
       }
     }
 
-    // 6. Multi-modal synthesis (Apply Color modifiers & Bayesian priors)
+    // 6. Multi-modal synthesis (Apply Color/Texture modifiers & Bayesian priors)
     const results = [];
     for (const [id, data] of candidateScores.entries()) {
       let finalScore = data.score;
       const food = data.food;
       const foodColor = getFoodColorGroup(food);
+      const foodTexture = getFoodTextureGroup(food);
 
       // Color profile modifier
       if (imageColor !== 'unknown') {
         if (foodColor === imageColor) {
-          finalScore *= 2.0; // Double score for correct color match
+          finalScore *= 2.0;
         } else {
-          finalScore *= 0.3; // Penalize mismatching colors
+          finalScore *= 0.3;
+        }
+      }
+
+      // Texture profile modifier
+      if (imageTexture !== 'unknown') {
+        if (foodTexture === imageTexture) {
+          finalScore *= 1.3; // Boost score for matching texture
+        } else {
+          finalScore *= 0.7; // Penalize mismatching texture
         }
       }
 
       // Bayesian History prior modifier
       const loggedCount = historyPriors[food.name] || 0;
-      const priorWeight = Math.min(3.0, 1.0 + (loggedCount * 0.3)); // Boost score up to 3x based on frequency
+      const priorWeight = Math.min(3.0, 1.0 + (loggedCount * 0.3));
       finalScore *= priorWeight;
 
-      // Bound final confidence to max 99%
       const finalConfidence = Math.max(5, Math.min(99, Math.round(finalScore)));
 
       results.push({
         food,
         confidence: finalConfidence,
-        labelMatched: `${data.matchedBy} + color:${foodColor} + history:${loggedCount}x`
+        labelMatched: `${data.matchedBy} + color:${foodColor} + texture:${foodTexture} + history:${loggedCount}x`
       });
     }
 

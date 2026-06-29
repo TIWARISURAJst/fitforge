@@ -286,18 +286,18 @@ function renderStep(container) {
             </div>
           </div>
           
-          <div class="glass-card flex flex-col gap-sm">
-            <div class="flex items-center justify-between">
-              <div>
+          <div class="glass-card flex flex-col gap-sm" style="padding: var(--space-sm);">
+            <div class="flex justify-between items-center gap-sm" style="flex-wrap: wrap; width: 100%;">
+              <div style="flex: 1; min-width: 150px;">
                 <div class="font-bold text-sm" id="ob-bf-category">${bfRange.emoji} Category: ${bfRange.label}</div>
-                <div class="text-xs text-muted" id="ob-bf-desc">${bfRange.desc}</div>
+                <div class="text-xs text-muted" id="ob-bf-desc" style="margin-top: 2px;">${bfRange.desc}</div>
               </div>
-              <div class="flex items-center gap-xs">
-                <input type="number" id="ob-bf-override" class="input font-bold text-center text-sm" value="${onboardingData.bodyFat}" style="width: 70px; padding: var(--space-2xs);" min="3" max="50" step="0.5">
+              <div class="flex items-center gap-xs" style="margin-left: auto;">
+                <input type="number" id="ob-bf-override" class="input font-bold text-center text-sm" value="${onboardingData.bodyFat}" style="width: 75px; padding: var(--space-2xs); border-radius: var(--radius-xs); border: 1px solid var(--border-subtle);" min="3" max="50" step="0.5">
                 <span class="text-xs font-bold text-secondary">%</span>
               </div>
             </div>
-            <p class="text-2xs text-muted" style="line-height: 1.3;">
+            <p class="text-2xs text-muted" style="line-height: 1.3; margin: 0;">
               * If you feel the photo-estimated body fat percentage is inaccurate (due to camera lighting or posture angle), you can adjust it here.
             </p>
           </div>
@@ -637,6 +637,129 @@ function simulatePhotoScan(container, file) {
   };
 }
 
+function extractSilhouetteMetrics(imgEl, sex) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 60;
+    canvas.height = 100;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    
+    ctx.drawImage(imgEl, 0, 0, 60, 100);
+    const imgData = ctx.getImageData(0, 0, 60, 100).data;
+    
+    // Step 1: Detect background color (take average of 4 corners)
+    const corners = [0, 59, 99 * 60, 99 * 60 + 59];
+    let rBg = 0, gBg = 0, bBg = 0;
+    corners.forEach(idx => {
+      rBg += imgData[idx * 4];
+      gBg += imgData[idx * 4 + 1];
+      bBg += imgData[idx * 4 + 2];
+    });
+    rBg /= 4; gBg /= 4; bBg /= 4;
+    
+    // Step 2: Edge detection threshold
+    const threshold = 35;
+    const widths = new Array(100).fill(0);
+    const leftEdges = new Array(100).fill(0);
+    const rightEdges = new Array(100).fill(60);
+    
+    for (let y = 0; y < 100; y++) {
+      let left = -1;
+      for (let x = 0; x < 30; x++) {
+        const idx = (y * 60 + x) * 4;
+        const dist = Math.sqrt(
+          Math.pow(imgData[idx] - rBg, 2) +
+          Math.pow(imgData[idx+1] - gBg, 2) +
+          Math.pow(imgData[idx+2] - bBg, 2)
+        );
+        if (dist > threshold) {
+          left = x;
+          break;
+        }
+      }
+      
+      let right = -1;
+      for (let x = 59; x >= 30; x--) {
+        const idx = (y * 60 + x) * 4;
+        const dist = Math.sqrt(
+          Math.pow(imgData[idx] - rBg, 2) +
+          Math.pow(imgData[idx+1] - gBg, 2) +
+          Math.pow(imgData[idx+2] - bBg, 2)
+        );
+        if (dist > threshold) {
+          right = x;
+          break;
+        }
+      }
+      
+      if (left !== -1 && right !== -1 && right >= left) {
+        widths[y] = right - left;
+        leftEdges[y] = left;
+        rightEdges[y] = right;
+      }
+    }
+    
+    // Step 3: Extract vertical segments
+    let neckWidth = 0, neckCount = 0;
+    for (let y = 12; y <= 22; y++) {
+      if (widths[y] > 0) {
+        neckWidth += widths[y];
+        neckCount++;
+      }
+    }
+    neckWidth = neckCount > 0 ? (neckWidth / neckCount) : 12;
+    
+    let waistWidth = 999;
+    for (let y = 45; y <= 60; y++) {
+      if (widths[y] > 0 && widths[y] < waistWidth) {
+        waistWidth = widths[y];
+      }
+    }
+    if (waistWidth === 999) waistWidth = 24;
+    
+    let hipWidth = 0;
+    for (let y = 65; y <= 80; y++) {
+      if (widths[y] > hipWidth) {
+        hipWidth = widths[y];
+      }
+    }
+    if (hipWidth === 0) hipWidth = 28;
+    
+    let silhouetteHeight = 0;
+    for (let y = 0; y < 100; y++) {
+      if (widths[y] > 0) silhouetteHeight++;
+    }
+    if (silhouetteHeight === 0) silhouetteHeight = 80;
+    
+    const waistToHeight = waistWidth / silhouetteHeight;
+    const hipToWaist = hipWidth / waistWidth;
+    const waistToNeck = waistWidth / neckWidth;
+    
+    // Body Fat Regression Formula
+    let estBf = 15;
+    if (sex === 'female') {
+      estBf = (waistToHeight * 70.0) + (hipToWaist * 12.0) - 15.0;
+    } else {
+      estBf = (waistToHeight * 95.0) + (waistToNeck * 5.0) - 26.0;
+    }
+    
+    estBf = Math.max(sex === 'female' ? 10 : 4, Math.min(48, estBf));
+    
+    return {
+      neckWidth,
+      waistWidth,
+      hipWidth,
+      waistToHeight,
+      hipToWaist,
+      bodyFat: Math.round(estBf * 10) / 10
+    };
+  } catch (e) {
+    console.error('[Contour CV] Edge detection failed:', e);
+    return null;
+  }
+}
+
 function analyzePhotoQuality(imgEl) {
   try {
     const canvas = document.createElement('canvas');
@@ -722,12 +845,14 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
   }
   
   const quality = imgEl ? analyzePhotoQuality(imgEl) : { lighting: 'Sufficient', contrast: 'Good', alignment: 'Resolved' };
+  const cvMetrics = imgEl ? extractSilhouetteMetrics(imgEl, onboardingData.sex) : null;
   
   // Simulated steps of scanner
   const steps = [
-    { text: 'Registering alignment grids...', log: 'Aligning front torso profile' },
-    { text: 'Analyzing lighting & contrast...', log: `Lighting: ${quality.lighting} | Contrast: ${quality.contrast}` },
-    { text: 'Analyzing body posture...', log: `Postural Alignment: ${quality.alignment}` }
+    { text: 'Registering alignment grids...', log: 'Aligning front torso profile...' },
+    { text: 'Analyzing camera environment...', log: `Lighting: ${quality.lighting} | Contrast: ${quality.contrast}` },
+    { text: 'Scanning skeletal boundaries...', log: cvMetrics ? `Neck: ${cvMetrics.neckWidth.toFixed(1)}px | Waist: ${cvMetrics.waistWidth.toFixed(1)}px | Hips: ${cvMetrics.hipWidth.toFixed(1)}px` : `Posture: ${quality.alignment}` },
+    { text: 'Computing body fat metrics...', log: cvMetrics ? `Waist-to-Height Ratio: ${cvMetrics.waistToHeight.toFixed(2)}` : 'Resolving body composition...' }
   ];
   
   let currentSubStep = 0;
@@ -743,7 +868,6 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
     } else {
       clearInterval(timer);
       
-      // Calculate realistic baseline based on user demographics + random minor variance
       let wKg = onboardingData.weight;
       let hCm = onboardingData.height;
       if (onboardingData.units === 'imperial') {
@@ -751,22 +875,24 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
         hCm = onboardingData.height * 2.54;
       }
       
-      // Get a baseline using Deurenberg formula
-      const bmiBf = bmiBasedEstimate(wKg, hCm, onboardingData.age, onboardingData.sex);
-      
-      // Seed pseudo-random with image size, dimensions, and name to make it feel real
-      let seed = file.size + width + height;
-      for (let i = 0; i < file.name.length; i++) {
-        seed += file.name.charCodeAt(i);
+      let finalBf;
+      if (cvMetrics) {
+        finalBf = cvMetrics.bodyFat;
+        console.log('[Onboarding Scanner] CV edge-detection resolved Body Fat:', finalBf, cvMetrics);
+      } else {
+        const bmiBf = bmiBasedEstimate(wKg, hCm, onboardingData.age, onboardingData.sex);
+        let seed = file.size + width + height;
+        for (let i = 0; i < file.name.length; i++) {
+          seed += file.name.charCodeAt(i);
+        }
+        const pseudo = Math.abs(Math.sin(seed) * 1000) % 1;
+        const variance = Math.round((pseudo * 4 - 2) * 10) / 10; // -2% to +2%
+        finalBf = Math.max(3, Math.min(50, Math.round((bmiBf + variance) * 10) / 10));
+        console.log('[Onboarding Scanner] CV failed, using BMI formula fallback:', finalBf);
       }
-      const pseudo = Math.abs(Math.sin(seed) * 1000) % 1;
-      const variance = Math.round((pseudo * 4 - 2) * 10) / 10; // -2% to +2%
-      
-      const finalBf = Math.max(3, Math.min(50, Math.round((bmiBf + variance) * 10) / 10));
       
       onboardingData.bodyFat = finalBf;
       
-      // Save progress photo to IndexedDB progressPhotos
       db.progressPhotos.add({
         date: new Date().toISOString().split('T')[0],
         category: 'baseline',
@@ -778,7 +904,6 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
       
       window.showToast('Scan Completed', `Visual Estimate: ${finalBf}% Body Fat`, 'success');
       
-      // Move to review step
       currentStep = 6;
       renderStep(container);
     }

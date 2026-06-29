@@ -672,7 +672,7 @@ function triggerPlateScanner(container, file) {
           
           <p class="text-sm text-secondary">We identified the following food candidates from your photo. Check the foods you actually ate and adjust servings:</p>
           
-          <div class="flex flex-col gap-xs" id="confirm-scan-list">
+          <div class="flex flex-col gap-xs" id="confirm-scan-list" style="max-height: 200px; overflow-y: auto; padding-right: 4px;">
             ${scanItems.slice(0, 4).map((food, i) => `
               <div class="glass-card" style="padding: var(--space-sm); border-color: ${i === 0 ? 'rgba(52, 217, 163, 0.4)' : 'var(--border-subtle)'};">
                 <div class="flex items-center gap-sm mb-xs">
