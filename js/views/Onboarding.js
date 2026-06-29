@@ -883,6 +883,7 @@ async function runScanAnimation(panel, container, file, imgUrl, width, height, i
   }
 
     let allDetections = [];
+    let people = [];
     if (imgEl && window.cocoSsd) {
       try {
         console.log('[Scanner SSD] Loading COCO-SSD for person check...');
