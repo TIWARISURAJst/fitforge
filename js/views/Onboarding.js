@@ -730,7 +730,12 @@ function extractSilhouetteMetrics(imgEl, sex) {
     for (let y = 0; y < 100; y++) {
       if (widths[y] > 0) silhouetteHeight++;
     }
-    if (silhouetteHeight === 0) silhouetteHeight = 80;
+    
+    // Strict Human Shape Verification
+    if (silhouetteHeight < 40 || waistWidth === 999 || hipWidth === 0) {
+      console.warn('[Contour CV] Image does not contain a standing human silhouette of sufficient height. height:', silhouetteHeight);
+      return null;
+    }
     
     const waistToHeight = waistWidth / silhouetteHeight;
     const hipToWaist = hipWidth / waistWidth;
@@ -866,31 +871,65 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
       logEl.textContent = steps[currentSubStep].log;
       currentSubStep++;
     } else {
+      if (!cvMetrics) {
+        clearInterval(timer);
+        panel.innerHTML = `
+          <div class="glass-card text-center p-md animate-in" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03); max-width: 100%;">
+            <div style="font-size: 2.2rem; margin-bottom: var(--space-xs);">👤❌</div>
+            <h3 style="color: var(--danger); font-weight: 700; margin-bottom: var(--space-xs); font-size: 1.1rem;">Human Silhouette Not Detected</h3>
+            <p class="text-xs text-secondary mb-md" style="line-height: 1.4; margin-bottom: var(--space-sm);">
+              The image analyzer could not map a standing human silhouette in this photo (potentially due to camera alignment, distance, or lighting). 
+              For visual scanning, please upload a clear, full-body portrait photo, or enter your body fat percentage manually to proceed:
+            </p>
+            
+            <div class="flex flex-col gap-sm" style="width: 100%;">
+              <div class="glass-card flex items-center justify-between" style="padding: var(--space-sm); border-color: var(--border-subtle); background: rgba(0,0,0,0.15);">
+                <span class="text-xs font-bold text-secondary">Body Fat Percentage:</span>
+                <div class="flex items-center gap-xs">
+                  <input type="number" id="ob-manual-bf-fallback" class="input font-bold text-center text-sm" value="18" style="width: 65px; padding: var(--space-2xs);" min="3" max="50" step="0.5">
+                  <span class="text-xs font-bold text-secondary">%</span>
+                </div>
+              </div>
+
+              <div class="flex gap-sm">
+                <button class="btn btn-secondary btn-sm" id="btn-err-reupload" style="flex: 1;">
+                  📷 Retry Photo
+                </button>
+                <button class="btn btn-primary btn-sm" id="btn-err-proceed" style="flex: 1;">
+                  Manual Entry 🚀
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        const reUploadBtn = document.getElementById('btn-err-reupload');
+        if (reUploadBtn) {
+          reUploadBtn.addEventListener('click', () => {
+            const input = document.getElementById('ob-photo-input');
+            if (input) input.click();
+          });
+        }
+        
+        const proceedBtn = document.getElementById('btn-err-proceed');
+        if (proceedBtn) {
+          proceedBtn.addEventListener('click', () => {
+            const valInput = document.getElementById('ob-manual-bf-fallback');
+            const manualVal = valInput ? parseFloat(valInput.value) : 18;
+            onboardingData.bodyFat = manualVal;
+            
+            window.showToast('Manual Entry Saved', `Proceeding with manual baseline: ${manualVal}%`, 'info');
+            currentStep = 6;
+            renderStep(container);
+          });
+        }
+        return;
+      }
+
       clearInterval(timer);
       
-      let wKg = onboardingData.weight;
-      let hCm = onboardingData.height;
-      if (onboardingData.units === 'imperial') {
-        wKg = onboardingData.weight / 2.20462;
-        hCm = onboardingData.height * 2.54;
-      }
-      
-      let finalBf;
-      if (cvMetrics) {
-        finalBf = cvMetrics.bodyFat;
-        console.log('[Onboarding Scanner] CV edge-detection resolved Body Fat:', finalBf, cvMetrics);
-      } else {
-        const bmiBf = bmiBasedEstimate(wKg, hCm, onboardingData.age, onboardingData.sex);
-        let seed = file.size + width + height;
-        for (let i = 0; i < file.name.length; i++) {
-          seed += file.name.charCodeAt(i);
-        }
-        const pseudo = Math.abs(Math.sin(seed) * 1000) % 1;
-        const variance = Math.round((pseudo * 4 - 2) * 10) / 10; // -2% to +2%
-        finalBf = Math.max(3, Math.min(50, Math.round((bmiBf + variance) * 10) / 10));
-        console.log('[Onboarding Scanner] CV failed, using BMI formula fallback:', finalBf);
-      }
-      
+      const finalBf = cvMetrics.bodyFat;
+      console.log('[Onboarding Scanner] CV resolved Body Fat:', finalBf, cvMetrics);
       onboardingData.bodyFat = finalBf;
       
       db.progressPhotos.add({
