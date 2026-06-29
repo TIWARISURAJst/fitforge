@@ -298,6 +298,29 @@ export async function classifyFoodImage(imgEl, fileName = '') {
 
   console.log('[Classifier] Running multi-modal classification, file:', fileName);
   try {
+    // 0. Object detection sanity validation (YOLO-equivalent COCO-SSD check)
+    if (window.cocoSsd) {
+      try {
+        console.log('[Classifier SSD] Loading COCO-SSD to verify food presence...');
+        const cocoModel = await window.cocoSsd.load();
+        const predictions = await cocoModel.detect(imgEl);
+        console.log('[Classifier SSD] Detections:', predictions);
+        
+        const foodClasses = ['banana', 'apple', 'sandwich', 'orange', 'broccoli', 'hot dog', 'pizza', 'donut', 'cake', 'bowl', 'cup', 'fork', 'knife', 'spoon', 'dining table', 'bottle'];
+        
+        const hasFoodItem = predictions.some(p => foodClasses.includes(p.class) && p.score >= 0.35);
+        // Irrelevant classes: animals, electronics, vehicles, etc.
+        const hasIrrelevantObjects = predictions.filter(p => !foodClasses.includes(p.class) && p.score >= 0.6);
+        
+        if (hasIrrelevantObjects.length > 0 && !hasFoodItem) {
+          console.warn('[Classifier SSD] Non-food image detected. Rejecting scan.');
+          return [{ error: 'NOT_FOOD' }];
+        }
+      } catch (e) {
+        console.warn('[Classifier SSD] Food validation check bypassed:', e);
+      }
+    }
+
     const candidateScores = new Map(); // food.id -> { food, score, matchedBy }
     const processedIds = new Set();
     

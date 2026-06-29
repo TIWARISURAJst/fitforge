@@ -819,7 +819,7 @@ function analyzePhotoQuality(imgEl) {
   }
 }
 
-function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) {
+async function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) {
   panel.innerHTML = `
     <div class="glass-card text-center animate-in" style="position: relative; overflow: hidden; padding: 0; min-height: 250px;">
       <img id="scan-preview" src="${imgUrl}" style="width: 100%; height: 250px; object-fit: cover; filter: brightness(0.6);">
@@ -828,10 +828,10 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
       <div id="laser-line" style="position: absolute; left: 0; right: 0; height: 3px; background: var(--success); top: 0; box-shadow: 0 0 10px var(--success-glow); animation: laserScroll 2s linear infinite;"></div>
       
       <!-- scanning indicators -->
-      <div class="flex flex-col items-center justify-center" style="position: absolute; inset: 0; background: rgba(10,10,20,0.4); pointer-events: none;">
+      <div class="flex flex-col items-center justify-center" style="position: absolute; inset: 0; background: rgba(10,10,20,0.6); pointer-events: none;">
         <div class="spinner mb-sm"></div>
-        <div class="font-bold text-sm text-gradient" id="scan-status">Detecting contours...</div>
-        <div class="text-xs text-muted" id="scan-log">Constructing visual baseline</div>
+        <div class="font-bold text-sm text-gradient" id="scan-status">Initialising object detector...</div>
+        <div class="text-xs text-muted" id="scan-log">Loading neural validation layers</div>
       </div>
     </div>
   `;
@@ -848,9 +848,23 @@ function runScanAnimation(panel, container, file, imgUrl, width, height, imgEl) 
     `;
     document.head.appendChild(style);
   }
+
+  // Await COCO-SSD object check to ensure a human standing shape is present
+  let ssdHumanDetected = true;
+  if (imgEl && window.cocoSsd) {
+    try {
+      console.log('[Scanner SSD] Loading COCO-SSD for visual validation...');
+      const cocoModel = await window.cocoSsd.load();
+      const detections = await cocoModel.detect(imgEl);
+      console.log('[Scanner SSD] Object detections:', detections);
+      ssdHumanDetected = detections.some(p => p.class === 'person' && p.score >= 0.4);
+    } catch (e) {
+      console.warn('[Scanner SSD] cocoSsd failed, fallback to silhouette contour validation:', e);
+    }
+  }
   
   const quality = imgEl ? analyzePhotoQuality(imgEl) : { lighting: 'Sufficient', contrast: 'Good', alignment: 'Resolved' };
-  const cvMetrics = imgEl ? extractSilhouetteMetrics(imgEl, onboardingData.sex) : null;
+  const cvMetrics = (imgEl && ssdHumanDetected) ? extractSilhouetteMetrics(imgEl, onboardingData.sex) : null;
   
   // Simulated steps of scanner
   const steps = [

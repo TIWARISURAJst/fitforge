@@ -457,19 +457,38 @@ function triggerPlateScanner(container, file) {
       if (logEl) logEl.textContent = 'Aligning color and history signatures...';
       await new Promise(r => setTimeout(r, 600));
       
+      const isNotFood = results.length > 0 && results[0].error === 'NOT_FOOD';
       const isLowConfidence = results.length === 0 || results[0].confidence < 40 || results[0].labelMatched.includes('fallback:');
 
-      if (isLowConfidence) {
+      if (isNotFood || isLowConfidence) {
         const todayStr = new Date().toISOString().split('T')[0];
-        const confirmBody = `
-          <div class="flex flex-col gap-md">
-            <div class="glass-card text-center py-sm" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03);">
+        
+        let headerHtml = '';
+        if (isNotFood) {
+          headerHtml = `
+            <div class="glass-card text-center py-sm animate-in" style="border-color: var(--danger); background: rgba(239, 68, 68, 0.04); padding: var(--space-sm);">
+              <span style="font-size: 1.8rem;">🍽️❌</span>
+              <div class="font-bold text-sm text-danger" style="margin-top: 4px; font-weight: 700;">Food Plate Not Detected</div>
+              <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; margin: 4px 0 0 0;">
+                The visual analyzer detected non-food items in this photo. Please capture/upload a clear photo of your food, or search manually below:
+              </p>
+            </div>
+          `;
+        } else {
+          headerHtml = `
+            <div class="glass-card text-center py-sm" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.03); padding: var(--space-sm);">
               <span style="font-size: 1.8rem;">🔍</span>
-              <div class="font-bold text-sm text-danger" style="margin-top: 4px;">Food Not Recognized</div>
-              <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; padding: 0 var(--space-xs);">
+              <div class="font-bold text-sm text-danger" style="margin-top: 4px; font-weight: 700;">Food Not Recognized</div>
+              <p class="text-xs text-secondary mt-xs" style="line-height: 1.4; margin: 4px 0 0 0;">
                 We were not able to recognize the food in this photo with high confidence. Please search and select the item manually below.
               </p>
             </div>
+          `;
+        }
+
+        const confirmBody = `
+          <div class="flex flex-col gap-md">
+            ${headerHtml}
             
             <div class="input-group relative" style="margin-bottom: var(--space-xs);">
               <label class="text-xs font-bold text-secondary">Search Food Item</label>
