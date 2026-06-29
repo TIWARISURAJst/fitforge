@@ -3,7 +3,7 @@
    Offline-first caching with hybrid strategies
    ============================================================ */
 
-const CACHE_NAME = 'fitforge-cache-v13';
+const CACHE_NAME = 'fitforge-cache-v14';
 const STATIC_ASSETS = [
   './',
   'index.html',
