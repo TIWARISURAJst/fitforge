@@ -733,13 +733,24 @@ function extractSilhouetteMetrics(imgEl, sex) {
     
     // Strict Human Shape Verification
     if (silhouetteHeight < 40 || waistWidth === 999 || hipWidth === 0) {
-      console.warn('[Contour CV] Image does not contain a standing human silhouette of sufficient height. height:', silhouetteHeight);
+      console.warn('[Contour CV] Human silhouette validation failed. height rows:', silhouetteHeight);
       return null;
     }
     
     const waistToHeight = waistWidth / silhouetteHeight;
     const hipToWaist = hipWidth / waistWidth;
     const waistToNeck = waistWidth / neckWidth;
+    
+    // Strict Anthropometric Shape Auditor
+    let isHumanShape = true;
+    if (waistToHeight < 0.12 || waistToHeight > 0.46) isHumanShape = false; // Torso aspect ratio check
+    if (hipToWaist < 0.95 || hipToWaist > 1.9) isHumanShape = false;       // Hip curvature ratio check
+    if (neckWidth >= waistWidth || neckWidth >= hipWidth) isHumanShape = false; // Neck scale verification
+    
+    if (!isHumanShape) {
+      console.warn('[Contour CV] Anthropometric proportions validation failed. waistToHeight:', waistToHeight.toFixed(2), 'hipToWaist:', hipToWaist.toFixed(2));
+      return null;
+    }
     
     // Body Fat Regression Formula
     let estBf = 15;

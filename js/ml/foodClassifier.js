@@ -452,6 +452,10 @@ export async function classifyFoodImage(imgEl, fileName = '') {
           });
         }
       }
+    // If no candidate matches food database and color is unknown, reject as non-food
+    if (candidateScores.size === 0 && imageColor === 'unknown') {
+      console.warn('[Classifier] Image does not align with any food color profile. Rejecting scan.');
+      return [{ error: 'NOT_FOOD' }];
     }
 
     // 6. Multi-modal synthesis (Apply Color/Texture modifiers & Bayesian priors)
