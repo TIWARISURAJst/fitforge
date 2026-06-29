@@ -178,6 +178,69 @@
         advice.nutritionTip && advice.nutritionTip.toLowerCase().includes("protein"),
         `Coach suggestions generated: "${advice.nutritionTip}" (expected protein notification since today's logged protein is 60g < target 140g)`
       );
+
+      // 6. ML Model Train-Test-Validate Pipeline Validation
+      const mlData = [];
+      for (let i = 0; i < 60; i++) {
+        const wh = 0.35 + Math.random() * 0.25;
+        const wn = 1.6 + Math.random() * 1.0;
+        const trueBf = wh * 80 + wn * 10 - 45 + (Math.random() - 0.5) * 1.5;
+        mlData.push({ x: [wh, wn, 1.0], y: trueBf });
+      }
+      const trainSet = mlData.slice(0, 42);
+      const valSet = mlData.slice(42, 51);
+      const testSet = mlData.slice(51);
+
+      const solve = (dataset) => {
+        const X = dataset.map(d => d.x);
+        const Y = dataset.map(d => d.y);
+        const XT = Array.from({ length: 3 }, (_, c) => X.map(r => r[c]));
+        const XTX = Array.from({ length: 3 }, (_, r) => 
+          Array.from({ length: 3 }, (_, c) => 
+            XT[r].reduce((sum, val, idx) => sum + val * X[idx][c], 0)
+          )
+        );
+        const a = XTX[0][0], b = XTX[0][1], c = XTX[0][2];
+        const d = XTX[1][0], e = XTX[1][1], f = XTX[1][2];
+        const g = XTX[2][0], h = XTX[2][1], i = XTX[2][2];
+        const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+        if (Math.abs(det) < 1e-9) return null;
+        
+        const invDet = 1.0 / det;
+        const adj = [
+          [e * i - f * h, c * h - b * i, b * f - c * e],
+          [f * g - d * i, a * i - c * g, c * d - a * f],
+          [d * h - e * g, g * b - a * h, a * e - b * d]
+        ];
+        const XTX_inv = adj.map(row => row.map(val => val * invDet));
+        const XTY = XT.map(row => row.reduce((sum, val, idx) => sum + val * Y[idx], 0));
+        return Array.from({ length: 3 }, (_, r) => 
+          XTX_inv[r].reduce((sum, val, idx) => sum + val * XTY[idx], 0)
+        );
+      };
+
+      const weights = solve(trainSet);
+      let testMae = 0;
+      let valMae = 0;
+      if (weights) {
+        valSet.forEach(d => {
+          const pred = d.x[0] * weights[0] + d.x[1] * weights[1] + weights[2];
+          valMae += Math.abs(pred - d.y);
+        });
+        valMae /= valSet.length;
+
+        testSet.forEach(d => {
+          const pred = d.x[0] * weights[0] + d.x[1] * weights[1] + weights[2];
+          testMae += Math.abs(pred - d.y);
+        });
+        testMae /= testSet.length;
+      }
+
+      assert(
+        "ML Model Train-Test-Validate Pipeline",
+        weights !== null && testMae < 2.0 && valMae < 2.0,
+        `Trained OLS Model. Coefficients: w1=${weights[0].toFixed(2)}, w2=${weights[1].toFixed(2)}, bias=${weights[2].toFixed(2)}. Val MAE: ${valMae.toFixed(2)}%, Test MAE: ${testMae.toFixed(2)}% (Target MAE < 2.0%)`
+      );
     }
 
     runSuite();

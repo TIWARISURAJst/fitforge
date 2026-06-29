@@ -255,6 +255,7 @@ function renderStep(container) {
     
     onboardingData.tdee = calculated.tdee;
     onboardingData.macros = calculated.macros;
+    const bfRange = getBFCategory(onboardingData.bodyFat, onboardingData.sex);
     stepContent = `
       <div class="animate-in">
         <h1>Your Forge is <span class="text-gradient">Ready</span>!</h1>
@@ -777,9 +778,9 @@ function extractSilhouetteMetrics(imgEl, sex, bbox = null) {
     // Body Fat Regression Formula
     let estBf = 15;
     if (sex === 'female') {
-      estBf = (waistToHeight * 70.0) + (hipToWaist * 12.0) - 15.0;
+      estBf = (waistToHeight * 172.5577) + (hipToWaist * 30.2459) + (-86.5395);
     } else {
-      estBf = (waistToHeight * 95.0) + (waistToNeck * 5.0) - 26.0;
+      estBf = (waistToHeight * 74.2354) + (waistToNeck * 11.8433) + (-42.7376);
     }
     
     estBf = Math.max(sex === 'female' ? 10 : 4, Math.min(48, estBf));
