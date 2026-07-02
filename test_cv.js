@@ -38,6 +38,22 @@ global.document = {
   }
 };
 
+global.onboardingData = {
+  height: 180,
+  units: 'metric'
+};
+
+global.navyMethod = ({ height, neck, waist, hip, sex }) => {
+  let bf;
+  if (sex === 'female') {
+    if (!hip) return null;
+    bf = 495 / (1.29579 - 0.35004 * Math.log10(waist + hip - neck) + 0.22100 * Math.log10(height)) - 450;
+  } else {
+    bf = 495 / (1.0324 - 0.19077 * Math.log10(waist - neck) + 0.15456 * Math.log10(height)) - 450;
+  }
+  return Math.max(2, Math.min(60, Math.round(bf * 10) / 10));
+};
+
 // Evaluate the function code in the global scope
 const extractSilhouetteMetrics = new Function('imgEl', 'sex', 'bbox', `
   try {

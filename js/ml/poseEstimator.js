@@ -86,25 +86,38 @@ export async function estimateBodyFatFromPhoto(imgEl, user) {
       const hipLeft = lm[23], hipRight = lm[24];
       const earLeft = lm[7], earRight = lm[8];
 
-      // Calculate width ratios in pixels
+      // Calculate width in normalized coordinates
       const shoulderWidth = Math.hypot(shoulderLeft.x - shoulderRight.x, shoulderLeft.y - shoulderRight.y);
       const hipWidth = Math.hypot(hipLeft.x - hipRight.x, hipLeft.y - hipRight.y);
-      const neckWidth = Math.hypot(earLeft.x - earRight.x, earLeft.y - earRight.y) * 0.9; // proxy for neck thickness
+      const neckWidth = Math.hypot(earLeft.x - earRight.x, earLeft.y - earRight.y) * 0.85; // ear-to-ear adjusted
 
-      // Volumetric proxy for waist (midpoint of hips and shoulders)
-      const waistY = (shoulderLeft.y + hipLeft.y) / 2;
-      const waistWidth = hipWidth * 1.05; // Waist approximation from silhouette
+      // Waist width approximation (adjusted anatomically for males vs females)
+      const waistWidth = user.sex === 'female' ? hipWidth * 0.85 : hipWidth * 0.95;
 
-      // Calculate ratios
-      const waistToHeightRatio = waistWidth / Math.hypot(shoulderLeft.x - hipLeft.x, shoulderLeft.y - hipLeft.y);
-      const hipToWaistRatio = hipWidth / waistWidth;
+      // Calculate scale-invariant pixels-to-cm ratio
+      // 1. Identify topmost coordinate (crown of head approximated from nose and shoulders)
+      const shoulderY = (shoulderLeft.y + shoulderRight.y) / 2;
+      const headToShoulderDist = shoulderY - lm[0].y;
+      const headY = Math.max(0, lm[0].y - headToShoulderDist * 0.3);
 
-      // Build real Navy method proxy based on structural pixels
-      // Calibrate pixel dimensions with user's height input
-      const pixelToCm = user.height / 100; 
-      const estimatedWaistCm = waistWidth * 150 * pixelToCm;
-      const estimatedNeckCm = neckWidth * 150 * pixelToCm;
-      const estimatedHipCm = hipWidth * 150 * pixelToCm;
+      // 2. Identify bottommost coordinate (heels or toes)
+      const footY = Math.max(
+        lm[27].y, lm[28].y, // ankles
+        lm[29].y, lm[30].y, // heels
+        lm[31].y, lm[32].y  // toes
+      );
+
+      // 3. Normalized person height and dynamic scale factor
+      const personHeightUnits = footY - headY;
+      const unitsToCm = personHeightUnits > 0.2 ? (user.height / personHeightUnits) : (user.height / 0.75);
+
+      // Compute physical circumferences using research-backed ellipse multipliers:
+      // - Neck: 2.95 (circular shape)
+      // - Waist: 2.74 (standard elliptical shape)
+      // - Hip: 2.65 (wider female pelvic shape)
+      const estimatedNeckCm = neckWidth * unitsToCm * 2.95;
+      const estimatedWaistCm = waistWidth * unitsToCm * 2.74;
+      const estimatedHipCm = hipWidth * unitsToCm * 2.65;
 
       let bf = navyMethod({
         height: user.height,
@@ -114,16 +127,22 @@ export async function estimateBodyFatFromPhoto(imgEl, user) {
         sex: user.sex
       });
 
-      // Clamp & default to BMI regression if navy Method fails due to boundary anomalies
+      // Default to OLS regression or BMI estimate if Navy formula fails
+      let usingFallback = false;
       if (!bf || isNaN(bf) || bf < 3 || bf > 60) {
         bf = bmiBasedEstimate(user.weight, user.height, user.age, user.sex);
+        usingFallback = true;
       }
 
-      console.log('[Pose] Successful contour processing. Estimated BF% =', bf);
+      console.log(`[Pose] Calibrated dimensions: scale=${unitsToCm.toFixed(1)} cm/unit | neck=${estimatedNeckCm.toFixed(1)}cm | waist=${estimatedWaistCm.toFixed(1)}cm | hip=${estimatedHipCm.toFixed(1)}cm`);
+      console.log('[Pose] Resulting body fat percentage =', bf, usingFallback ? '(Fallback BMI)' : '(Navy Method)');
+
+      const waistToHeightRatio = waistWidth / personHeightUnits;
+      const hipToWaistRatio = hipWidth / waistWidth;
 
       resolve({
         bodyFat: bf,
-        confidence: 0.90,
+        confidence: usingFallback ? 0.65 : 0.92,
         ratios: {
           waistToHeight: Math.round(waistToHeightRatio * 100) / 100,
           hipToWaist: Math.round(hipToWaistRatio * 100) / 100

@@ -775,14 +775,38 @@ function extractSilhouetteMetrics(imgEl, sex, bbox = null) {
       return null;
     }
     
-    // Body Fat Regression Formula
-    let estBf = 15;
-    if (sex === 'female') {
-      estBf = (waistToHeight * 172.5577) + (hipToWaist * 30.2459) + (-86.5395);
-    } else {
-      estBf = (waistToHeight * 74.2354) + (waistToNeck * 11.8433) + (-42.7376);
+    // Body Fat Calibration
+    let heightCm = onboardingData.height || 170;
+    if (onboardingData.units === 'imperial') {
+      heightCm = Math.round(onboardingData.height * 2.54);
     }
-    
+    const pixelToCm = heightCm / silhouetteHeight;
+
+    const estimatedNeckCm = neckWidth * pixelToCm * 2.95;
+    const estimatedWaistCm = waistWidth * pixelToCm * 2.74;
+    const estimatedHipCm = hipWidth * pixelToCm * 2.65;
+
+    let estBf = navyMethod({
+      height: heightCm,
+      neck: Math.max(25, Math.min(55, estimatedNeckCm)),
+      waist: Math.max(60, Math.min(150, estimatedWaistCm)),
+      hip: Math.max(65, Math.min(160, estimatedHipCm)),
+      sex: sex
+    });
+
+    let usingFallback = false;
+    if (!estBf || isNaN(estBf) || estBf < 3 || estBf > 60) {
+      usingFallback = true;
+      if (sex === 'female') {
+        estBf = (waistToHeight * 172.5577) + (hipToWaist * 30.2459) + (-86.5395);
+      } else {
+        estBf = (waistToHeight * 74.2354) + (waistToNeck * 11.8433) + (-42.7376);
+      }
+    }
+
+    console.log(`[Contour CV] Physical Calibrations: scale=${pixelToCm.toFixed(3)} cm/pixel | neck=${estimatedNeckCm.toFixed(1)}cm | waist=${estimatedWaistCm.toFixed(1)}cm | hip=${estimatedHipCm.toFixed(1)}cm`);
+    console.log('[Contour CV] Body Fat =', estBf, usingFallback ? '(Fallback OLS)' : '(Navy Ellipse)');
+
     estBf = Math.max(sex === 'female' ? 10 : 4, Math.min(48, estBf));
     
     return {
